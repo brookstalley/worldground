@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
 
+use worldground::cli::commands;
 use worldground::config::generation::GenerationParams;
+use worldground::config::simulation::SimulationConfig;
 use worldground::persistence;
 use worldground::world::generation::{generate_world, print_world_summary};
 
@@ -33,14 +35,14 @@ enum Commands {
 
     /// Start the simulation server
     Run {
-        /// Path to the world snapshot to load
+        /// Path to a specific world snapshot to load
         #[arg(short, long)]
         world: Option<String>,
     },
 
     /// Inspect world or tile state
     Inspect {
-        /// Tile ID to inspect (omit for world summary)
+        /// Tile ID to inspect
         #[arg(short, long)]
         tile: Option<u32>,
 
@@ -72,7 +74,8 @@ enum SnapshotAction {
     },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
@@ -97,21 +100,37 @@ fn main() {
                 }
             }
         }
+
         Commands::Run { world } => {
-            let source = world.as_deref().unwrap_or("latest snapshot");
-            println!("Would start simulation from {}", source);
-            println!("(Not yet implemented)");
-        }
-        Commands::Inspect { tile, world } => {
-            if let Some(id) = tile {
-                println!("Would inspect tile {}", id);
-            } else if world {
-                println!("Would show world summary");
-            } else {
-                println!("Specify --tile <ID> or --world");
+            let config = match SimulationConfig::from_file(Path::new(&cli.config)) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Error loading config: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            if let Err(e) = commands::run_simulation(&config, world.as_deref()).await {
+                eprintln!("Simulation error: {}", e);
+                std::process::exit(1);
             }
-            println!("(Not yet implemented)");
         }
+
+        Commands::Inspect { tile, world } => {
+            let config = match SimulationConfig::from_file(Path::new(&cli.config)) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Error loading config: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            if let Err(e) = commands::inspect(&config, tile, world) {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        }
+
         Commands::Snapshots { action } => match action {
             SnapshotAction::List { dir } => {
                 let snapshot_dir = Path::new(&dir);
