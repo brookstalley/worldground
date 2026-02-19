@@ -1,0 +1,33 @@
+# Prawduct machine-specific files
+.prawduct/framework-path
+.prawduct/framework-version
+
+# Prawduct session files (ephemeral, machine-local)
+.prawduct/.orchestrator-activated
+.prawduct/.session-governance.json
+.prawduct/.session-governance.json.bak
+.prawduct/.session-edits.json
+.prawduct/.product-session.json
+.prawduct/.onboarding-state.json
+.prawduct/.critic-pending
+.prawduct/.critic-findings.json
+
+
+# Rust build artifacts
+/target
+
+# World snapshots (binary, regenerable)
+/snapshots/*.bin
+
+# Prawduct machine-specific files
+
+# Prawduct session files (ephemeral, machine-local)
+.prawduct/.active-product
+
+# Prawduct machine-specific files
+
+# Prawduct session files (ephemeral, machine-local)
+.prawduct/.session-trace.jsonl
+
+# Prawduct session traces (local-only, never shared automatically)
+.prawduct/traces/
