@@ -294,6 +294,71 @@ impl RuleEngine {
 
         Ok(mutations)
     }
+
+    /// Evaluate all rules for a phase on a single tile using pre-converted Rhai maps.
+    ///
+    /// This avoids redundant tile-to-map conversions when the same maps are reused
+    /// across multiple evaluations (e.g., neighbor maps shared between tiles).
+    pub fn evaluate_tile_preconverted(
+        &self,
+        phase: Phase,
+        tile_map: &Dynamic,
+        neighbor_maps: Vec<Dynamic>,
+        season: &Season,
+        tick: u64,
+        rng_seed: u64,
+        tile_id: u32,
+    ) -> Result<TileMutations, RuleError> {
+        let rules = self.rules_for_phase(phase);
+        if rules.is_empty() {
+            return Ok(TileMutations::default());
+        }
+
+        let season_str = match season {
+            Season::Spring => "Spring",
+            Season::Summer => "Summer",
+            Season::Autumn => "Autumn",
+            Season::Winter => "Winter",
+        };
+
+        MUTATIONS.with(|m| m.borrow_mut().clear());
+        LOG_MESSAGES.with(|l| l.borrow_mut().clear());
+        RNG_STATE.with(|r| r.set(rng_seed));
+
+        for rule in rules {
+            let mut scope = Scope::new();
+            scope.push_constant("tile", tile_map.clone());
+            scope.push_constant("neighbors", neighbor_maps.clone());
+            scope.push_constant("season", season_str.to_string());
+            scope.push_constant("tick", tick as i64);
+
+            let result = self.engine.run_ast_with_scope(&mut scope, &rule.ast);
+
+            LOG_MESSAGES.with(|l| {
+                for msg in l.borrow().iter() {
+                    eprintln!("[Rule {}][Tile {}] {}", rule.name, tile_id, msg);
+                }
+                l.borrow_mut().clear();
+            });
+
+            if let Err(e) = result {
+                MUTATIONS.with(|m| m.borrow_mut().clear());
+                return Err(RuleError {
+                    tile_id,
+                    rule_name: rule.name.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
+
+        let mutations = MUTATIONS.with(|m| {
+            let muts = m.borrow().clone();
+            m.borrow_mut().clear();
+            TileMutations { mutations: muts }
+        });
+
+        Ok(mutations)
+    }
 }
 
 // Thread-local storage for collecting mutations during rule execution
@@ -315,7 +380,7 @@ fn xorshift64(mut state: u64) -> u64 {
 }
 
 /// Convert a Tile to a Rhai Map for script access.
-fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
+pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     let mut map = Map::new();
 
     map.insert("id".into(), Dynamic::from(tile.id as i64));
