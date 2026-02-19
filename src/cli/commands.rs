@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
+use tracing::{error, info, warn};
 
 use crate::config::simulation::SimulationConfig;
 use crate::persistence;
@@ -18,29 +19,29 @@ pub async fn run_simulation(
     let snapshot_dir = Path::new(&config.snapshot_directory);
     let mut world = match world_path {
         Some(path) => {
-            eprintln!("Loading world from {}", path);
+            info!(path, "Loading world from snapshot");
             persistence::load_snapshot(Path::new(path))
                 .map_err(|e| format!("Failed to load snapshot: {}", e))?
         }
         None => {
-            eprintln!("Loading latest snapshot from {}", config.snapshot_directory);
+            info!(dir = %config.snapshot_directory, "Loading latest snapshot");
             persistence::load_latest_valid_snapshot(snapshot_dir)
                 .map_err(|e| format!("Failed to load snapshot: {}", e))?
         }
     };
 
-    eprintln!(
-        "World loaded: {} tiles, tick {}, season {:?}",
-        world.tiles.len(),
-        world.tick_count,
-        world.season
+    info!(
+        tiles = world.tiles.len(),
+        tick = world.tick_count,
+        season = ?world.season,
+        "World loaded"
     );
 
     // 2. Load rules
     let rule_dir = Path::new(&config.rule_directory);
     let engine = RuleEngine::new(rule_dir, config.rule_timeout_ms as u64)
         .map_err(|e| format!("Failed to load rules: {}", e))?;
-    eprintln!("Rules loaded from {}", config.rule_directory);
+    info!(dir = %config.rule_directory, "Rules loaded");
 
     // 3. Build initial snapshot JSON and create server state
     let snapshot_json = server::build_snapshot_json(&world);
@@ -54,7 +55,7 @@ pub async fn run_simulation(
     let server_state = Arc::clone(&state);
     tokio::spawn(async move {
         if let Err(e) = server::start_server(server_state, addr).await {
-            eprintln!("Server error: {}", e);
+            error!("Server error: {}", e);
         }
     });
 
@@ -67,9 +68,10 @@ pub async fn run_simulation(
     let mut last_snapshot_tick = world.tick_count;
     let mut ticks_since_snapshot: u32 = 0;
 
-    eprintln!(
-        "Simulation running (tick rate: {}Hz, snapshot every {} ticks)",
-        config.tick_rate_hz, config.snapshot_interval
+    info!(
+        tick_rate_hz = config.tick_rate_hz,
+        snapshot_interval = config.snapshot_interval,
+        "Simulation running"
     );
 
     loop {
@@ -106,10 +108,10 @@ pub async fn run_simulation(
 
         // Log errors
         if !result.rule_errors.is_empty() {
-            eprintln!(
-                "Tick {}: {} rule errors",
-                world.tick_count,
-                result.rule_errors.len()
+            warn!(
+                tick = world.tick_count,
+                error_count = result.rule_errors.len(),
+                "Rule errors in tick"
             );
         }
 
@@ -120,29 +122,29 @@ pub async fn run_simulation(
                 Ok(path) => {
                     last_snapshot_tick = world.tick_count;
                     ticks_since_snapshot = 0;
-                    eprintln!("Snapshot saved: {}", path.display());
+                    info!(path = %path.display(), "Snapshot saved");
 
                     // Prune old snapshots
                     if let Err(e) =
                         persistence::prune_snapshots(snapshot_dir, config.max_snapshots as usize)
                     {
-                        eprintln!("Warning: snapshot pruning failed: {}", e);
+                        warn!("Snapshot pruning failed: {}", e);
                     }
                 }
                 Err(e) => {
-                    eprintln!("Warning: snapshot save failed: {}", e);
+                    warn!("Snapshot save failed: {}", e);
                 }
             }
         }
 
         // Tick milestone logging
         if world.tick_count % 1000 == 0 {
-            eprintln!(
-                "Tick {} | Season: {:?} | Diversity: {:.3} | Errors: {}",
-                world.tick_count,
-                world.season,
-                result.statistics.diversity_index,
-                result.statistics.rule_errors
+            info!(
+                tick = world.tick_count,
+                season = ?world.season,
+                diversity = result.statistics.diversity_index,
+                rule_errors = result.statistics.rule_errors,
+                "Tick milestone"
             );
         }
 
@@ -154,7 +156,7 @@ pub async fn run_simulation(
             tokio::select! {
                 _ = tokio::time::sleep(sleep_duration) => {}
                 _ = &mut shutdown => {
-                    eprintln!("\nShutdown signal received");
+                    info!("Shutdown signal received");
                     break;
                 }
             }
@@ -163,7 +165,7 @@ pub async fn run_simulation(
             tokio::select! {
                 biased;
                 _ = &mut shutdown => {
-                    eprintln!("\nShutdown signal received");
+                    info!("Shutdown signal received");
                     break;
                 }
                 else => {}
@@ -172,13 +174,13 @@ pub async fn run_simulation(
     }
 
     // Graceful shutdown: save final snapshot
-    eprintln!("Saving final snapshot...");
+    info!("Saving final snapshot...");
     match persistence::save_snapshot(&world, snapshot_dir) {
-        Ok(path) => eprintln!("Final snapshot saved: {}", path.display()),
-        Err(e) => eprintln!("Warning: final snapshot save failed: {}", e),
+        Ok(path) => info!(path = %path.display(), "Final snapshot saved"),
+        Err(e) => warn!("Final snapshot save failed: {}", e),
     }
 
-    eprintln!("Simulation stopped at tick {}", world.tick_count);
+    info!(tick = world.tick_count, "Simulation stopped");
     Ok(())
 }
 

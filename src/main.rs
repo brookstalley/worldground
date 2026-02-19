@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
+use tracing::error;
+use tracing_subscriber::EnvFilter;
 
 use worldground::cli::commands;
 use worldground::config::generation::GenerationParams;
@@ -38,6 +40,18 @@ enum Commands {
         /// Path to a specific world snapshot to load
         #[arg(short, long)]
         world: Option<String>,
+
+        /// Override tick rate (Hz) from config
+        #[arg(long)]
+        tick_rate: Option<f32>,
+
+        /// Override WebSocket port from config
+        #[arg(long)]
+        port: Option<u16>,
+
+        /// Override log level from config
+        #[arg(long)]
+        log_level: Option<String>,
     },
 
     /// Inspect world or tile state
@@ -76,6 +90,13 @@ enum SnapshotAction {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .init();
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -83,7 +104,7 @@ async fn main() {
             let params = match GenerationParams::from_file(Path::new(&worldgen)) {
                 Ok(p) => p,
                 Err(e) => {
-                    eprintln!("Error loading generation config: {}", e);
+                    error!("Error loading generation config: {}", e);
                     std::process::exit(1);
                 }
             };
@@ -95,23 +116,34 @@ async fn main() {
             match persistence::save_snapshot(&world, snapshot_dir) {
                 Ok(path) => println!("\nWorld saved to {}", path.display()),
                 Err(e) => {
-                    eprintln!("Cannot save snapshot: {}", e);
+                    error!("Cannot save snapshot: {}", e);
                     std::process::exit(1);
                 }
             }
         }
 
-        Commands::Run { world } => {
-            let config = match SimulationConfig::from_file(Path::new(&cli.config)) {
+        Commands::Run { world, tick_rate, port, log_level } => {
+            let mut config = match SimulationConfig::from_file(Path::new(&cli.config)) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("Error loading config: {}", e);
+                    error!("Error loading config: {}", e);
                     std::process::exit(1);
                 }
             };
 
+            // Apply CLI overrides
+            if let Some(rate) = tick_rate {
+                config.tick_rate_hz = rate;
+            }
+            if let Some(p) = port {
+                config.websocket_port = p;
+            }
+            if let Some(level) = log_level {
+                config.log_level = level;
+            }
+
             if let Err(e) = commands::run_simulation(&config, world.as_deref()).await {
-                eprintln!("Simulation error: {}", e);
+                error!("Simulation error: {}", e);
                 std::process::exit(1);
             }
         }
@@ -120,13 +152,13 @@ async fn main() {
             let config = match SimulationConfig::from_file(Path::new(&cli.config)) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("Error loading config: {}", e);
+                    error!("Error loading config: {}", e);
                     std::process::exit(1);
                 }
             };
 
             if let Err(e) = commands::inspect(&config, tile, world) {
-                eprintln!("Error: {}", e);
+                error!("{}", e);
                 std::process::exit(1);
             }
         }
@@ -164,7 +196,7 @@ async fn main() {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error listing snapshots: {}", e);
+                        error!("Error listing snapshots: {}", e);
                         std::process::exit(1);
                     }
                 }
@@ -177,7 +209,7 @@ async fn main() {
                         print_world_summary(&world);
                     }
                     Err(e) => {
-                        eprintln!("Error restoring snapshot: {}", e);
+                        error!("Error restoring snapshot: {}", e);
                         std::process::exit(1);
                     }
                 }

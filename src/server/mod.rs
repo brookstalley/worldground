@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, RwLock};
 use tokio_tungstenite::tungstenite::Message;
+use tracing::{error, info, warn};
 
 use crate::simulation::statistics::TickStatistics;
 use crate::world::tile::Season;
@@ -134,14 +135,14 @@ pub async fn start_server(
     addr: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listener = TcpListener::bind(addr).await?;
-    eprintln!("Server listening on {}", addr);
+    info!(%addr, "Server listening");
 
     loop {
         let (stream, peer) = listener.accept().await?;
         let state = Arc::clone(&state);
         tokio::spawn(async move {
             if let Err(e) = handle_connection(stream, peer, state).await {
-                eprintln!("Connection error from {}: {}", peer, e);
+                error!(%peer, "Connection error: {}", e);
             }
         });
     }
@@ -172,7 +173,7 @@ async fn handle_websocket(
     state: Arc<ServerState>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let ws_stream = tokio_tungstenite::accept_async(stream).await?;
-    eprintln!("WebSocket connected: {}", peer);
+    info!(%peer, "WebSocket connected");
 
     let (mut write, mut read) = futures_util::StreamExt::split(ws_stream);
 
@@ -194,7 +195,7 @@ async fn handle_websocket(
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        eprintln!("Client {} lagged by {} messages", peer, n);
+                        warn!(%peer, lagged = n, "Client lagged behind on diffs");
                         // Continue — client missed some diffs but will stay connected
                     }
                     Err(broadcast::error::RecvError::Closed) => {
@@ -212,7 +213,7 @@ async fn handle_websocket(
         }
     }
 
-    eprintln!("WebSocket disconnected: {}", peer);
+    info!(%peer, "WebSocket disconnected");
     Ok(())
 }
 

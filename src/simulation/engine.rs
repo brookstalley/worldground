@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
+use tracing::debug;
 
 use crate::world::tile::*;
 use crate::world::Tile;
@@ -267,7 +268,7 @@ impl RuleEngine {
             // Collect any log messages
             LOG_MESSAGES.with(|l| {
                 for msg in l.borrow().iter() {
-                    eprintln!("[Rule {}][Tile {}] {}", rule.name, tile.id, msg);
+                    debug!(rule = %rule.name, tile_id = tile.id, "{}", msg);
                 }
                 l.borrow_mut().clear();
             });
@@ -336,7 +337,7 @@ impl RuleEngine {
 
             LOG_MESSAGES.with(|l| {
                 for msg in l.borrow().iter() {
-                    eprintln!("[Rule {}][Tile {}] {}", rule.name, tile_id, msg);
+                    debug!(rule = %rule.name, tile_id, "{}", msg);
                 }
                 l.borrow_mut().clear();
             });

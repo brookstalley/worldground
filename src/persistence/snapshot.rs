@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::warn;
 
 use crate::world::World;
 
@@ -200,10 +201,10 @@ pub fn load_latest_valid_snapshot(snapshot_dir: &Path) -> Result<World, Snapshot
         match load_snapshot(&snapshot.path) {
             Ok(world) => return Ok(world),
             Err(e) => {
-                eprintln!(
-                    "Warning: Snapshot {} is corrupt ({}), trying next...",
-                    snapshot.path.display(),
-                    e
+                warn!(
+                    path = %snapshot.path.display(),
+                    error = %e,
+                    "Corrupt snapshot, trying next"
                 );
             }
         }

@@ -2,6 +2,8 @@ pub mod engine;
 pub mod phase;
 pub mod statistics;
 
+use tracing::warn;
+
 use crate::simulation::engine::{Phase, RuleEngine, RuleError};
 use crate::simulation::statistics::TickStatistics;
 use crate::world::World;
@@ -62,11 +64,11 @@ pub fn execute_tick(
     let total_tiles = world.tiles.len();
     let error_count = all_errors.len();
     if total_tiles > 0 && error_count > total_tiles / 10 {
-        eprintln!(
-            "WARNING: Rule cascade detected — {} of {} tiles ({:.1}%) had errors this tick",
+        warn!(
             error_count,
             total_tiles,
-            (error_count as f64 / total_tiles as f64) * 100.0
+            pct = (error_count as f64 / total_tiles as f64) * 100.0,
+            "Rule cascade detected"
         );
     }
 

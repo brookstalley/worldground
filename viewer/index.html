@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worldground Viewer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+
+#app { display: flex; height: 100vh; }
+
+#canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+#canvas-container.dragging { cursor: grabbing; }
+
+canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#sidebar {
+  width: 280px;
+  background: #16213e;
+  border-left: 1px solid #0f3460;
+  padding: 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+#sidebar h2 {
+  font-size: 14px;
+  color: #e94560;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+#sidebar h3 {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 16px 0 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.stat-row .label { color: #aaa; }
+.stat-row .value { color: #fff; font-variant-numeric: tabular-nums; }
+
+.biome-bar {
+  display: flex;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 4px 0 8px;
+}
+
+.biome-segment { transition: width 0.3s ease; }
+
+.biome-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+}
+.biome-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.biome-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+#connection-status {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.status-connected { background: #0f5132; color: #75b798; }
+.status-disconnected { background: #842029; color: #ea868f; }
+.status-connecting { background: #664d03; color: #ffda6a; }
+
+#tile-info {
+  background: #1a1a2e;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 12px;
+  margin-top: 12px;
+  display: none;
+}
+#tile-info.visible { display: block; }
+#tile-info .layer-title {
+  color: #e94560;
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+#tile-info .layer-title:first-child { margin-top: 0; }
+
+#color-mode {
+  margin-top: 12px;
+  font-size: 12px;
+}
+#color-mode select {
+  width: 100%;
+  padding: 4px 8px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvas-container">
+    <canvas id="hex-canvas"></canvas>
+  </div>
+  <div id="sidebar">
+    <h2>Worldground</h2>
+    <div id="connection-status" class="status-connecting">Connecting...</div>
+
+    <div class="stat-row"><span class="label">Tick</span><span class="value" id="stat-tick">-</span></div>
+    <div class="stat-row"><span class="label">Season</span><span class="value" id="stat-season">-</span></div>
+    <div class="stat-row"><span class="label">Tiles</span><span class="value" id="stat-tiles">-</span></div>
+    <div class="stat-row"><span class="label">Diversity</span><span class="value" id="stat-diversity">-</span></div>
+    <div class="stat-row"><span class="label">Avg Temp</span><span class="value" id="stat-temp">-</span></div>
+    <div class="stat-row"><span class="label">Avg Moisture</span><span class="value" id="stat-moisture">-</span></div>
+    <div class="stat-row"><span class="label">Tick Time</span><span class="value" id="stat-tickms">-</span></div>
+    <div class="stat-row"><span class="label">Rule Errors</span><span class="value" id="stat-errors">-</span></div>
+
+    <h3>Biome Distribution</h3>
+    <div class="biome-bar" id="biome-bar"></div>
+    <div class="biome-legend" id="biome-legend"></div>
+
+    <div id="color-mode">
+      <label>Color by:</label>
+      <select id="color-select">
+        <option value="biome" selected>Biome</option>
+        <option value="elevation">Elevation</option>
+        <option value="temperature">Temperature</option>
+        <option value="moisture">Soil Moisture</option>
+        <option value="vegetation">Vegetation Health</option>
+        <option value="terrain">Terrain Type</option>
+      </select>
+    </div>
+
+    <div id="tile-info">
+      <div class="layer-title">Selected Tile</div>
+      <div id="tile-detail"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Biome & terrain color maps
+// ============================================================
+const BIOME_COLORS = {
+  Ocean: '#1a5276',
+  Desert: '#f0d68a',
+  Grassland: '#7daf4b',
+  Forest: '#2d6a30',
+  Rainforest: '#145a32',
+  Tundra: '#b8c6d0',
+  Taiga: '#4a6741',
+  Savanna: '#c4a747',
+  Wetland: '#5a7a5a',
+  Mountain: '#8b8b8b',
+  Ice: '#dce6f0',
+};
+
+const TERRAIN_COLORS = {
+  DeepOcean: '#0d3559',
+  ShallowOcean: '#1a6e9e',
+  Coastal: '#5da0c2',
+  Lowland: '#6db36d',
+  Highland: '#a8a060',
+  Mountain: '#8b8b8b',
+  Peak: '#c8c8c8',
+};
+
+// ============================================================
+// State
+// ============================================================
+let tiles = {};          // id -> tile data
+let tilePositions = {};  // id -> {x, y}
+let gridWidth = 0;
+let gridHeight = 0;
+let hexSize = 12;        // pixels per hex unit
+
+let viewOffsetX = 0;
+let viewOffsetY = 0;
+let zoom = 1;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragStartOffsetX = 0;
+let dragStartOffsetY = 0;
+let selectedTile = null;
+let colorMode = 'biome';
+
+let stats = {};
+let ws = null;
+
+// ============================================================
+// Canvas setup
+// ============================================================
+const canvas = document.getElementById('hex-canvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvas-container');
+
+function resizeCanvas() {
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  render();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ============================================================
+// Hex math (pointy-top)
+// ============================================================
+function hexCorner(cx, cy, size, i) {
+  const angle = Math.PI / 180 * (60 * i - 30);
+  return [cx + size * Math.cos(angle), cy + size * Math.sin(angle)];
+}
+
+function drawHex(cx, cy, size, fillColor, strokeColor) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const [hx, hy] = hexCorner(cx, cy, size, i);
+    if (i === 0) ctx.moveTo(hx, hy);
+    else ctx.lineTo(hx, hy);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  if (strokeColor) {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+}
+
+function pixelToTile(px, py) {
+  // Convert screen pixel to world coordinates
+  const wx = (px - viewOffsetX) / zoom;
+  const wy = (py - viewOffsetY) / zoom;
+
+  // Find closest tile center
+  let closest = null;
+  let closestDist = Infinity;
+  for (const [id, pos] of Object.entries(tilePositions)) {
+    const dx = wx - pos.sx;
+    const dy = wy - pos.sy;
+    const dist = dx * dx + dy * dy;
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = parseInt(id);
+    }
+  }
+  // Only select if within hex radius
+  if (closestDist < (hexSize * hexSize)) return closest;
+  return null;
+}
+
+// ============================================================
+// Color computation
+// ============================================================
+function getTileColor(tile) {
+  switch (colorMode) {
+    case 'biome':
+      return BIOME_COLORS[tile.biome?.biome_type] || '#444';
+    case 'terrain':
+      return TERRAIN_COLORS[tile.geology?.terrain_type] || '#444';
+    case 'elevation': {
+      const e = tile.geology?.elevation ?? 0;
+      const t = Math.max(0, Math.min(1, e));
+      return `hsl(${200 - t * 200}, 60%, ${20 + t * 60}%)`;
+    }
+    case 'temperature': {
+      const temp = tile.weather?.temperature ?? 273;
+      const norm = Math.max(0, Math.min(1, (temp - 230) / 80));
+      return `hsl(${240 - norm * 240}, 70%, ${30 + norm * 40}%)`;
+    }
+    case 'moisture': {
+      const m = tile.conditions?.soil_moisture ?? 0;
+      const v = Math.max(0, Math.min(1, m));
+      return `hsl(${30 + v * 180}, 60%, ${25 + v * 40}%)`;
+    }
+    case 'vegetation': {
+      const vh = tile.biome?.vegetation_health ?? 0;
+      const vv = Math.max(0, Math.min(1, vh));
+      return `hsl(${60 + vv * 60}, ${30 + vv * 50}%, ${20 + vv * 40}%)`;
+    }
+    default:
+      return '#444';
+  }
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(viewOffsetX, viewOffsetY);
+  ctx.scale(zoom, zoom);
+
+  const size = hexSize;
+  const invZoom = 1 / zoom;
+  const viewLeft = -viewOffsetX * invZoom - size * 2;
+  const viewRight = (canvas.width - viewOffsetX) * invZoom + size * 2;
+  const viewTop = -viewOffsetY * invZoom - size * 2;
+  const viewBottom = (canvas.height - viewOffsetY) * invZoom + size * 2;
+
+  for (const [id, pos] of Object.entries(tilePositions)) {
+    // Frustum culling
+    if (pos.sx < viewLeft || pos.sx > viewRight || pos.sy < viewTop || pos.sy > viewBottom) continue;
+
+    const tile = tiles[id];
+    if (!tile) continue;
+
+    const color = getTileColor(tile);
+    const stroke = (parseInt(id) === selectedTile) ? '#e94560' : '#111';
+    drawHex(pos.sx, pos.sy, size * 0.95, color, stroke);
+
+    if (parseInt(id) === selectedTile) {
+      drawHex(pos.sx, pos.sy, size * 0.95, 'transparent', '#e94560');
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+// ============================================================
+// Interaction (pan, zoom, click)
+// ============================================================
+container.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragStartOffsetX = viewOffsetX;
+  dragStartOffsetY = viewOffsetY;
+  container.classList.add('dragging');
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  viewOffsetX = dragStartOffsetX + (e.clientX - dragStartX);
+  viewOffsetY = dragStartOffsetY + (e.clientY - dragStartY);
+  render();
+});
+
+window.addEventListener('mouseup', (e) => {
+  if (!isDragging) return;
+  const moved = Math.abs(e.clientX - dragStartX) + Math.abs(e.clientY - dragStartY);
+  isDragging = false;
+  container.classList.remove('dragging');
+
+  // If barely moved, treat as click
+  if (moved < 4) {
+    const rect = canvas.getBoundingClientRect();
+    const tileId = pixelToTile(e.clientX - rect.left, e.clientY - rect.top);
+    selectTile(tileId);
+  }
+});
+
+container.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const oldZoom = zoom;
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  zoom = Math.max(0.1, Math.min(10, zoom * delta));
+
+  // Zoom toward cursor
+  viewOffsetX = mx - (mx - viewOffsetX) * (zoom / oldZoom);
+  viewOffsetY = my - (my - viewOffsetY) * (zoom / oldZoom);
+
+  render();
+}, { passive: false });
+
+document.getElementById('color-select').addEventListener('change', (e) => {
+  colorMode = e.target.value;
+  render();
+});
+
+// ============================================================
+// Tile selection
+// ============================================================
+function selectTile(id) {
+  selectedTile = id;
+  const info = document.getElementById('tile-info');
+  const detail = document.getElementById('tile-detail');
+
+  if (id === null || !tiles[id]) {
+    info.classList.remove('visible');
+    render();
+    return;
+  }
+
+  const t = tiles[id];
+  info.classList.add('visible');
+  detail.innerHTML = `
+    <div class="stat-row"><span class="label">ID</span><span class="value">${t.id}</span></div>
+    <div class="layer-title">Geology</div>
+    <div class="stat-row"><span class="label">Terrain</span><span class="value">${t.geology?.terrain_type}</span></div>
+    <div class="stat-row"><span class="label">Elevation</span><span class="value">${t.geology?.elevation?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Soil</span><span class="value">${t.geology?.soil_type}</span></div>
+    <div class="layer-title">Climate</div>
+    <div class="stat-row"><span class="label">Zone</span><span class="value">${t.climate?.zone}</span></div>
+    <div class="stat-row"><span class="label">Base Temp</span><span class="value">${t.climate?.base_temperature?.toFixed(1)}K</span></div>
+    <div class="layer-title">Biome</div>
+    <div class="stat-row"><span class="label">Type</span><span class="value">${t.biome?.biome_type}</span></div>
+    <div class="stat-row"><span class="label">Veg Health</span><span class="value">${t.biome?.vegetation_health?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Veg Density</span><span class="value">${t.biome?.vegetation_density?.toFixed(3)}</span></div>
+    <div class="layer-title">Weather</div>
+    <div class="stat-row"><span class="label">Temp</span><span class="value">${t.weather?.temperature?.toFixed(1)}K (${(t.weather?.temperature - 273.15)?.toFixed(1)}&deg;C)</span></div>
+    <div class="stat-row"><span class="label">Precip</span><span class="value">${t.weather?.precipitation?.toFixed(3)} (${t.weather?.precipitation_type})</span></div>
+    <div class="stat-row"><span class="label">Wind</span><span class="value">${t.weather?.wind_speed?.toFixed(1)} @ ${t.weather?.wind_direction?.toFixed(0)}&deg;</span></div>
+    <div class="stat-row"><span class="label">Clouds</span><span class="value">${t.weather?.cloud_cover?.toFixed(3)}</span></div>
+    <div class="layer-title">Conditions</div>
+    <div class="stat-row"><span class="label">Moisture</span><span class="value">${t.conditions?.soil_moisture?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Snow</span><span class="value">${t.conditions?.snow_depth?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Fire Risk</span><span class="value">${t.conditions?.fire_risk?.toFixed(3)}</span></div>
+  `;
+  render();
+}
+
+// ============================================================
+// Stats panel
+// ============================================================
+function updateStats(s) {
+  stats = s;
+  document.getElementById('stat-tick').textContent = s.tick ?? '-';
+  document.getElementById('stat-diversity').textContent = s.diversity_index?.toFixed(3) ?? '-';
+  document.getElementById('stat-temp').textContent =
+    s.avg_temperature ? `${s.avg_temperature.toFixed(1)}K (${(s.avg_temperature - 273.15).toFixed(1)}\u00B0C)` : '-';
+  document.getElementById('stat-moisture').textContent = s.avg_moisture?.toFixed(3) ?? '-';
+  document.getElementById('stat-tickms').textContent = s.tick_duration_ms ? `${s.tick_duration_ms.toFixed(1)}ms` : '-';
+  document.getElementById('stat-errors').textContent = s.rule_errors ?? '-';
+
+  // Biome distribution bar
+  if (s.biome_distribution) {
+    const total = Object.values(s.biome_distribution).reduce((a, b) => a + b, 0);
+    const bar = document.getElementById('biome-bar');
+    const legend = document.getElementById('biome-legend');
+    let barHtml = '';
+    let legendHtml = '';
+    const sorted = Object.entries(s.biome_distribution).sort((a, b) => b[1] - a[1]);
+    for (const [biome, count] of sorted) {
+      const pct = (count / total * 100);
+      const color = BIOME_COLORS[biome] || '#444';
+      barHtml += `<div class="biome-segment" style="width:${pct}%;background:${color}" title="${biome}: ${pct.toFixed(1)}%"></div>`;
+      legendHtml += `<span class="biome-legend-item"><span class="biome-legend-swatch" style="background:${color}"></span>${biome}</span>`;
+    }
+    bar.innerHTML = barHtml;
+    legend.innerHTML = legendHtml;
+  }
+}
+
+// ============================================================
+// WebSocket connection
+// ============================================================
+function connect() {
+  const host = location.hostname || 'localhost';
+  const port = new URLSearchParams(location.search).get('port') || '9090';
+  const url = `ws://${host}:${port}`;
+
+  setStatus('connecting');
+  ws = new WebSocket(url);
+
+  ws.onopen = () => setStatus('connected');
+
+  ws.onclose = () => {
+    setStatus('disconnected');
+    setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => setStatus('disconnected');
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.message_type === 'WorldSnapshot') {
+      handleSnapshot(msg);
+    } else if (msg.message_type === 'TickDiff') {
+      handleDiff(msg);
+    }
+  };
+}
+
+function setStatus(state) {
+  const el = document.getElementById('connection-status');
+  el.className = `status-${state}`;
+  el.textContent = state === 'connected' ? 'Connected' :
+                    state === 'connecting' ? 'Connecting...' : 'Disconnected';
+}
+
+function handleSnapshot(msg) {
+  tiles = {};
+  tilePositions = {};
+
+  document.getElementById('stat-season').textContent = msg.season;
+  document.getElementById('stat-tiles').textContent = msg.tile_count;
+  document.getElementById('stat-tick').textContent = msg.tick;
+
+  // Compute grid bounds for centering
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  for (const t of msg.tiles) {
+    tiles[t.id] = t;
+    const sx = t.position.x * hexSize;
+    const sy = t.position.y * hexSize;
+    tilePositions[t.id] = { sx, sy };
+    minX = Math.min(minX, sx);
+    maxX = Math.max(maxX, sx);
+    minY = Math.min(minY, sy);
+    maxY = Math.max(maxY, sy);
+  }
+
+  // Center view
+  const worldW = maxX - minX;
+  const worldH = maxY - minY;
+  zoom = Math.min(canvas.width / (worldW + hexSize * 4), canvas.height / (worldH + hexSize * 4));
+  zoom = Math.max(0.1, Math.min(5, zoom));
+  viewOffsetX = (canvas.width - worldW * zoom) / 2 - minX * zoom;
+  viewOffsetY = (canvas.height - worldH * zoom) / 2 - minY * zoom;
+
+  render();
+}
+
+function handleDiff(msg) {
+  document.getElementById('stat-tick').textContent = msg.tick;
+  document.getElementById('stat-season').textContent = msg.season;
+
+  // Apply changes
+  for (const change of msg.changed_tiles) {
+    const t = tiles[change.id];
+    if (!t) continue;
+    if (change.weather) t.weather = change.weather;
+    if (change.conditions) t.conditions = change.conditions;
+    if (change.biome) t.biome = change.biome;
+    if (change.resources) t.resources = change.resources;
+  }
+
+  if (msg.statistics) {
+    updateStats(msg.statistics);
+  }
+
+  // Update selected tile display if visible
+  if (selectedTile !== null && tiles[selectedTile]) {
+    selectTile(selectedTile);
+  } else {
+    render();
+  }
+}
+
+// ============================================================
+// Init
+// ============================================================
+resizeCanvas();
+connect();
+</script>
+</body>
+</html>

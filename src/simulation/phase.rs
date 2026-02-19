@@ -1,3 +1,5 @@
+use tracing::warn;
+
 use crate::simulation::engine::{
     apply_mutations, tile_to_rhai_map, Phase, RuleEngine, RuleError, TileMutations,
 };
@@ -126,9 +128,11 @@ fn filter_invalid_biome_transitions(
                     return true; // No-op, keep it
                 }
                 if !valid.contains(&target) {
-                    eprintln!(
-                        "WARNING: Invalid biome transition {:?} -> {:?} rejected for tile {}",
-                        current_biome, target, current_tile.id
+                    warn!(
+                        tile_id = current_tile.id,
+                        from = ?current_biome,
+                        to = ?target,
+                        "Invalid biome transition rejected"
                     );
                     return false;
                 }
