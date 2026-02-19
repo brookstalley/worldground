@@ -1,0 +1,29 @@
+# Worldground Simulation Configuration
+
+# Target ticks per second (actual rate depends on world size and rule complexity)
+tick_rate_hz = 1.0
+
+# Ticks between automatic world snapshots
+snapshot_interval = 100
+
+# Maximum number of snapshots to retain (oldest pruned beyond this)
+max_snapshots = 10
+
+# Directory for world state snapshots
+snapshot_directory = "./snapshots"
+
+# WebSocket server settings
+websocket_port = 8080
+websocket_bind = "127.0.0.1"
+
+# Path to Rhai rule script directories
+rule_directory = "./rules"
+
+# Logging verbosity: error, warn, info, debug, trace
+log_level = "info"
+
+# Ticks per season (4 seasons per year)
+season_length = 90
+
+# Maximum per-tile rule execution time in milliseconds
+rule_timeout_ms = 10
