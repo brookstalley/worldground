@@ -1,0 +1,25 @@
+# Worldground World Generation Parameters
+
+# Random seed for deterministic generation (0 = random)
+seed = 0
+
+# Target number of hex tiles (minimum 100)
+tile_count = 1000
+
+# Fraction of world that is ocean (0.0 - 1.0)
+ocean_ratio = 0.6
+
+# Fraction of land that is mountainous (0.0 - 0.5)
+mountain_ratio = 0.1
+
+# Terrain elevation variation intensity (0.0 = flat, 1.0 = extreme)
+elevation_roughness = 0.5
+
+# Use latitude-based climate zone bands
+climate_bands = true
+
+# Resource scattering density (0.0 = none, 1.0 = dense)
+resource_density = 0.3
+
+# How established initial biomes are (affects resistance to early changes)
+initial_biome_maturity = 0.5
