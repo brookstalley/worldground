@@ -37,9 +37,13 @@ enum Commands {
 
     /// Start the simulation server
     Run {
-        /// Path to a specific world snapshot to load
+        /// Path to a snapshot file to resume from (omit to generate a fresh world)
         #[arg(short, long)]
         world: Option<String>,
+
+        /// Path to world generation config file (used when generating fresh)
+        #[arg(long, default_value = "worldgen.toml")]
+        worldgen: String,
 
         /// Override tick rate (Hz) from config
         #[arg(long)]
@@ -122,7 +126,7 @@ async fn main() {
             }
         }
 
-        Commands::Run { world, tick_rate, port, log_level } => {
+        Commands::Run { world, worldgen, tick_rate, port, log_level } => {
             let mut config = match SimulationConfig::from_file(Path::new(&cli.config)) {
                 Ok(c) => c,
                 Err(e) => {
@@ -142,7 +146,14 @@ async fn main() {
                 config.log_level = level;
             }
 
-            if let Err(e) = commands::run_simulation(&config, world.as_deref()).await {
+            // Determine world source: explicit snapshot path or generate fresh
+            let initial_world = if let Some(ref path) = world {
+                commands::WorldSource::Snapshot(path.clone())
+            } else {
+                commands::WorldSource::Generate(worldgen)
+            };
+
+            if let Err(e) = commands::run_simulation(&config, initial_world).await {
                 error!("Simulation error: {}", e);
                 std::process::exit(1);
             }

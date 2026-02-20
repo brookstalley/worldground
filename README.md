@@ -48,11 +48,14 @@ git clone https://github.com/brookstalley/worldground.git && cd worldground
 # Build in release mode (recommended for worlds over 1K tiles)
 cargo build --release
 
-# Generate a world
+# Generate a world (saved to snapshots/)
 cargo run --release -- generate
 
-# Start the simulation server (terminal 1)
+# Start the simulation with a fresh world (terminal 1)
 cargo run --release -- run
+
+# Or resume from a saved snapshot
+cargo run --release -- run --world snapshots/world-tick1400-1771617715.bin
 ```
 
 Then in a **second terminal**, serve the viewer:
@@ -61,7 +64,9 @@ Then in a **second terminal**, serve the viewer:
 cd viewer && python3 -m http.server 8081
 ```
 
-Open **http://localhost:8081**. The viewer auto-connects to the simulation on WebSocket port 8080.
+Open **http://localhost:8081**. The viewer auto-connects to the simulation on WebSocket port 8118.
+
+Use `cargo run --release -- snapshots list` to see available snapshots.
 
 At ~1 tick/second for 16K tiles, you'll see weather patterns form and sweep across the world in real time. Drop to 1K tiles (`tile_count = 1000` in `worldgen.toml`) for 8+ ticks/second.
 
@@ -124,7 +129,7 @@ tick_rate_hz = 1.0        # target ticks per second
 season_length = 90        # ticks per season
 snapshot_interval = 100   # ticks between auto-saves
 rule_timeout_ms = 10      # per-tile rule execution limit (ms)
-websocket_port = 8080
+websocket_port = 8118
 ```
 
 ## Writing rules
@@ -172,7 +177,7 @@ Rules in the same phase see the pre-phase snapshot, not each other's mutations. 
 
 ```
 worldground generate [--worldgen FILE] [--output DIR]
-worldground run [--world PATH] [--tick-rate HZ] [--port PORT]
+worldground run [--world SNAPSHOT] [--worldgen FILE] [--tick-rate HZ] [--port PORT] [--log-level LEVEL]
 worldground inspect --tile ID
 worldground inspect --world
 worldground snapshots list

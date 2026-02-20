@@ -3,31 +3,42 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+use crate::config::generation::GenerationParams;
 use crate::config::simulation::SimulationConfig;
 use crate::persistence;
 use crate::server::{self, ServerState};
 use crate::simulation;
 use crate::simulation::engine::RuleEngine;
+use crate::world::generation::generate_world;
 use crate::world::tile::{WeatherLayer, ConditionsLayer, BiomeLayer, ResourceLayer};
 use crate::world::World;
+
+/// How the simulation should obtain its initial world.
+pub enum WorldSource {
+    /// Load a specific snapshot file.
+    Snapshot(String),
+    /// Generate a fresh world from a worldgen config file.
+    Generate(String),
+}
 
 /// Run the simulation: load world, start WebSocket server, run tick loop.
 pub async fn run_simulation(
     config: &SimulationConfig,
-    world_path: Option<&str>,
+    source: WorldSource,
 ) -> Result<(), String> {
-    // 1. Load world
+    // 1. Load or generate world
     let snapshot_dir = Path::new(&config.snapshot_directory);
-    let mut world = match world_path {
-        Some(path) => {
-            info!(path, "Loading world from snapshot");
-            persistence::load_snapshot(Path::new(path))
+    let mut world = match source {
+        WorldSource::Snapshot(path) => {
+            info!(path = %path, "Loading world from snapshot");
+            persistence::load_snapshot(Path::new(&path))
                 .map_err(|e| format!("Failed to load snapshot: {}", e))?
         }
-        None => {
-            info!(dir = %config.snapshot_directory, "Loading latest snapshot");
-            persistence::load_latest_valid_snapshot(snapshot_dir)
-                .map_err(|e| format!("Failed to load snapshot: {}", e))?
+        WorldSource::Generate(worldgen_path) => {
+            let params = GenerationParams::from_file(Path::new(&worldgen_path))
+                .map_err(|e| format!("Failed to load worldgen config: {}", e))?;
+            info!(config = %worldgen_path, "Generating fresh world");
+            generate_world(&params)
         }
     };
 
