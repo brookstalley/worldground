@@ -16,6 +16,8 @@
 | bincode | 1.x | Binary serialization for snapshots |
 | toml | 0.8 | TOML config file parsing |
 | noise | 0.9 | Perlin/simplex noise for procedural terrain generation |
+| hexasphere | 18 | Icosahedron subdivision for geodesic sphere topology |
+| glam | 0.32 | 3D math (Vec3A) — required by hexasphere |
 | rand | 0.8 | Random number generation |
 | rand_chacha | 0.3 | Deterministic RNG for world generation |
 | clap | 4.x (derive feature) | CLI argument parsing |
@@ -35,3 +37,4 @@
 - **tokio** + **tokio-tungstenite** handle the WebSocket server for real-time visualization
 - **serde** + **serde_json** + **bincode** handle all serialization (JSON for network, bincode for persistence)
 - **noise** + **rand** + **rand_chacha** handle procedural world generation
+- **hexasphere** + **glam** provide geodesic sphere grid generation (icosahedron subdivision)

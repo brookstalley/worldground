@@ -141,6 +141,7 @@ canvas {
     <div class="stat-row"><span class="label">Tick</span><span class="value" id="stat-tick">-</span></div>
     <div class="stat-row"><span class="label">Season</span><span class="value" id="stat-season">-</span></div>
     <div class="stat-row"><span class="label">Tiles</span><span class="value" id="stat-tiles">-</span></div>
+    <div class="stat-row"><span class="label">Topology</span><span class="value" id="stat-topology">-</span></div>
     <div class="stat-row"><span class="label">Diversity</span><span class="value" id="stat-diversity">-</span></div>
     <div class="stat-row"><span class="label">Avg Temp</span><span class="value" id="stat-temp">-</span></div>
     <div class="stat-row"><span class="label">Avg Moisture</span><span class="value" id="stat-moisture">-</span></div>
@@ -223,6 +224,7 @@ let dragStartOffsetX = 0;
 let dragStartOffsetY = 0;
 let selectedTile = null;
 let colorMode = 'biome';
+let topologyType = 'FlatHex';
 
 let stats = {};
 let ws = null;
@@ -509,6 +511,10 @@ function selectTile(id) {
   info.classList.add('visible');
   detail.innerHTML = `
     <div class="stat-row"><span class="label">ID</span><span class="value">${t.id}</span></div>
+    ${topologyType === 'Geodesic' ? `
+    <div class="stat-row"><span class="label">Lat</span><span class="value">${t.position?.lat?.toFixed(2)}&deg;</span></div>
+    <div class="stat-row"><span class="label">Lon</span><span class="value">${t.position?.lon?.toFixed(2)}&deg;</span></div>
+    ` : ''}
     <div class="layer-title">Geology</div>
     <div class="stat-row"><span class="label">Terrain</span><span class="value">${t.geology?.terrain_type}</span></div>
     <div class="stat-row"><span class="label">Elevation</span><span class="value">${t.geology?.elevation?.toFixed(3)}</span></div>
@@ -610,17 +616,28 @@ function handleSnapshot(msg) {
   tiles = {};
   tilePositions = {};
 
+  topologyType = msg.topology_type || 'FlatHex';
   document.getElementById('stat-season').textContent = msg.season;
   document.getElementById('stat-tiles').textContent = msg.tile_count;
   document.getElementById('stat-tick').textContent = msg.tick;
+  document.getElementById('stat-topology').textContent = topologyType;
 
   // Compute grid bounds for centering
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
+  const geoScale = hexSize * 2; // ~24 px/degree for equirectangular projection
+
   for (const t of msg.tiles) {
     tiles[t.id] = t;
-    const sx = t.position.x * hexSize;
-    const sy = t.position.y * hexSize;
+    let sx, sy;
+    if (topologyType === 'Geodesic') {
+      // Equirectangular projection: lon → x, lat → y
+      sx = (t.position.lon + 180) * geoScale;
+      sy = (90 - t.position.lat) * geoScale;
+    } else {
+      sx = t.position.x * hexSize;
+      sy = t.position.y * hexSize;
+    }
     tilePositions[t.id] = { sx, sy };
     minX = Math.min(minX, sx);
     maxX = Math.max(maxX, sx);

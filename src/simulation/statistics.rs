@@ -111,7 +111,7 @@ mod tests {
 
     fn make_test_world(tile_count: usize) -> World {
         let tiles: Vec<Tile> = (0..tile_count)
-            .map(|i| Tile::new_default(i as u32, vec![], Position { x: 0.0, y: 0.0 }))
+            .map(|i| Tile::new_default(i as u32, vec![], Position::flat(0.0, 0.0)))
             .collect();
         World {
             id: Uuid::new_v4(),
@@ -131,6 +131,7 @@ mod tests {
                 climate_bands: true,
                 resource_density: 0.3,
                 initial_biome_maturity: 0.5,
+                topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
             tiles,

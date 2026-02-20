@@ -340,6 +340,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: crate::config::generation::TopologyConfig::default(),
         }
     }
 
@@ -375,8 +376,8 @@ mod tests {
     #[test]
     fn build_diff_json_is_valid() {
         let before = vec![
-            Tile::new_default(0, vec![], Position { x: 0.0, y: 0.0 }),
-            Tile::new_default(1, vec![], Position { x: 1.0, y: 0.0 }),
+            Tile::new_default(0, vec![], Position::flat(0.0, 0.0)),
+            Tile::new_default(1, vec![], Position::flat(1.0, 0.0)),
         ];
         let mut after = before.clone();
         after[0].weather.temperature = 300.0;
@@ -396,7 +397,7 @@ mod tests {
 
     #[test]
     fn build_diff_json_empty_when_no_changes() {
-        let tiles = vec![Tile::new_default(0, vec![], Position { x: 0.0, y: 0.0 })];
+        let tiles = vec![Tile::new_default(0, vec![], Position::flat(0.0, 0.0))];
         let stats = make_test_stats(1);
         let json = build_diff_json(&tiles, &tiles, 1, Season::Spring, &stats);
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");

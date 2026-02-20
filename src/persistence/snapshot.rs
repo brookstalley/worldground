@@ -231,6 +231,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: crate::config::generation::TopologyConfig::default(),
         };
         generate_world(&params)
     }

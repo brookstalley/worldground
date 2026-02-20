@@ -86,6 +86,23 @@ pub enum TopologyType {
 pub struct Position {
     pub x: f64,
     pub y: f64,
+    pub z: f64,
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl Position {
+    /// Create a flat-mode position (z/lat/lon default to 0.0).
+    /// Used by flat hex grid and in tests for convenience.
+    pub fn flat(x: f64, y: f64) -> Self {
+        Self {
+            x,
+            y,
+            z: 0.0,
+            lat: 0.0,
+            lon: 0.0,
+        }
+    }
 }
 
 // === Layer Structs ===
@@ -228,7 +245,7 @@ mod tests {
 
     #[test]
     fn tile_creation_has_all_layers() {
-        let tile = Tile::new_default(0, vec![1, 2, 3, 4, 5, 6], Position { x: 0.0, y: 0.0 });
+        let tile = Tile::new_default(0, vec![1, 2, 3, 4, 5, 6], Position::flat(0.0, 0.0));
         assert_eq!(tile.id, 0);
         assert_eq!(tile.neighbors.len(), 6);
         assert_eq!(tile.geology.terrain_type, TerrainType::Plains);
@@ -248,7 +265,7 @@ mod tests {
     #[test]
     fn tile_serde_round_trip() {
         let mut tile =
-            Tile::new_default(42, vec![1, 2, 3, 4, 5, 6], Position { x: 10.5, y: 20.3 });
+            Tile::new_default(42, vec![1, 2, 3, 4, 5, 6], Position::flat(10.5, 20.3));
         tile.resources.resources.push(ResourceDeposit {
             resource_type: "iron".to_string(),
             quantity: 50.0,

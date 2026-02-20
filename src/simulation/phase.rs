@@ -188,7 +188,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn make_test_tile(id: u32) -> crate::world::Tile {
-        crate::world::Tile::new_default(id, vec![], Position { x: 0.0, y: 0.0 })
+        crate::world::Tile::new_default(id, vec![], Position::flat(0.0, 0.0))
     }
 
     fn setup_empty_rule_dirs(dir: &Path) {
@@ -229,6 +229,7 @@ mod tests {
                 climate_bands: true,
                 resource_density: 0.3,
                 initial_biome_maturity: 0.5,
+                topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
             tiles: vec![make_test_tile(0), make_test_tile(1)],
@@ -287,6 +288,7 @@ mod tests {
                 climate_bands: true,
                 resource_density: 0.3,
                 initial_biome_maturity: 0.5,
+                topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
             tiles: vec![

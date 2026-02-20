@@ -1,3 +1,8 @@
+use std::collections::HashSet;
+
+use hexasphere::shapes::IcoSphereBase;
+use hexasphere::Subdivided;
+
 use crate::world::tile::{Position, Tile};
 
 /// Neighbor offsets for even rows (row % 2 == 0) in odd-r offset layout.
@@ -85,13 +90,79 @@ fn offset_to_pixel(col: u32, row: u32) -> Position {
     let size = 1.0_f64;
     let x = size * 3.0_f64.sqrt() * (col as f64 + 0.5 * (row % 2) as f64);
     let y = size * 1.5 * row as f64;
-    Position { x, y }
+    Position::flat(x, y)
+}
+
+/// Calculate the exact tile count for a geodesic grid at a given subdivision level.
+///
+/// Formula: `10 * 4^level + 2`. Level 4 → 2,562 tiles.
+pub fn geodesic_tile_count(level: u32) -> u32 {
+    10 * 4u32.pow(level) + 2
+}
+
+/// Generate a geodesic grid by subdividing an icosahedron.
+///
+/// Produces a hex grid on a unit sphere with exactly 12 pentagons (5 neighbors)
+/// and all other tiles as hexagons (6 neighbors).
+///
+/// # Panics
+/// Panics if `level` is not in 1..=7.
+pub fn generate_geodesic_grid(level: u32) -> Vec<Tile> {
+    assert!(
+        (1..=7).contains(&level),
+        "Geodesic subdivision level must be 1-7, got {}",
+        level
+    );
+
+    // hexasphere uses linear edge subdivision: n subdivisions → (n+1)^2 vertices per face.
+    // To match our formula (10 * 4^level + 2), we need subdivisions = 2^level - 1.
+    let hexasphere_subdivisions = (1usize << level) - 1;
+    let sphere = Subdivided::<(), IcoSphereBase>::new(hexasphere_subdivisions, |_| ());
+    let points = sphere.raw_points();
+    let indices = sphere.get_all_indices();
+    let vertex_count = points.len();
+
+    // Build neighbor adjacency from shared triangle edges
+    let mut neighbor_sets: Vec<HashSet<u32>> = vec![HashSet::new(); vertex_count];
+    for chunk in indices.chunks(3) {
+        let a = chunk[0];
+        let b = chunk[1];
+        let c = chunk[2];
+        neighbor_sets[a as usize].insert(b);
+        neighbor_sets[a as usize].insert(c);
+        neighbor_sets[b as usize].insert(a);
+        neighbor_sets[b as usize].insert(c);
+        neighbor_sets[c as usize].insert(a);
+        neighbor_sets[c as usize].insert(b);
+    }
+
+    let mut tiles = Vec::with_capacity(vertex_count);
+    for (i, point) in points.iter().enumerate() {
+        let x = point.x as f64;
+        let y = point.y as f64;
+        let z = point.z as f64;
+        let lat = z.asin().to_degrees();
+        let lon = y.atan2(x).to_degrees();
+
+        let mut neighbor_vec: Vec<u32> = neighbor_sets[i].iter().copied().collect();
+        neighbor_vec.sort_unstable(); // deterministic ordering
+
+        let position = Position {
+            x,
+            y,
+            z,
+            lat,
+            lon,
+        };
+        tiles.push(Tile::new_default(i as u32, neighbor_vec, position));
+    }
+
+    tiles
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
     use std::collections::VecDeque;
 
     #[test]
@@ -236,6 +307,176 @@ mod tests {
     fn topology_is_deterministic() {
         let tiles1 = generate_flat_hex_grid(10, 10);
         let tiles2 = generate_flat_hex_grid(10, 10);
+        assert_eq!(tiles1.len(), tiles2.len());
+        for (t1, t2) in tiles1.iter().zip(tiles2.iter()) {
+            assert_eq!(t1.id, t2.id);
+            assert_eq!(t1.neighbors, t2.neighbors);
+            assert_eq!(t1.position, t2.position);
+        }
+    }
+
+    // === Geodesic grid tests ===
+
+    #[test]
+    fn geodesic_tile_count_formula() {
+        assert_eq!(geodesic_tile_count(1), 42);
+        assert_eq!(geodesic_tile_count(2), 162);
+        assert_eq!(geodesic_tile_count(3), 642);
+        assert_eq!(geodesic_tile_count(4), 2562);
+        assert_eq!(geodesic_tile_count(5), 10242);
+        assert_eq!(geodesic_tile_count(6), 40962);
+        assert_eq!(geodesic_tile_count(7), 163842);
+    }
+
+    #[test]
+    fn geodesic_correct_tile_counts() {
+        for level in 1..=5 {
+            let tiles = generate_geodesic_grid(level);
+            let expected = geodesic_tile_count(level) as usize;
+            assert_eq!(
+                tiles.len(),
+                expected,
+                "Level {} should have {} tiles, got {}",
+                level,
+                expected,
+                tiles.len()
+            );
+        }
+    }
+
+    #[test]
+    fn geodesic_exactly_12_pentagons() {
+        let tiles = generate_geodesic_grid(4);
+        let pentagons: Vec<_> = tiles.iter().filter(|t| t.neighbors.len() == 5).collect();
+        let hexagons: Vec<_> = tiles.iter().filter(|t| t.neighbors.len() == 6).collect();
+        let other: Vec<_> = tiles
+            .iter()
+            .filter(|t| t.neighbors.len() != 5 && t.neighbors.len() != 6)
+            .collect();
+
+        assert_eq!(
+            pentagons.len(),
+            12,
+            "Expected exactly 12 pentagons, got {}",
+            pentagons.len()
+        );
+        assert_eq!(hexagons.len(), tiles.len() - 12);
+        assert!(
+            other.is_empty(),
+            "Found {} tiles with neither 5 nor 6 neighbors",
+            other.len()
+        );
+    }
+
+    #[test]
+    fn geodesic_neighbors_bidirectional() {
+        let tiles = generate_geodesic_grid(3);
+        for tile in &tiles {
+            for &neighbor_id in &tile.neighbors {
+                let neighbor = &tiles[neighbor_id as usize];
+                assert!(
+                    neighbor.neighbors.contains(&tile.id),
+                    "Tile {} has neighbor {}, but {} does not have {} as neighbor",
+                    tile.id,
+                    neighbor_id,
+                    neighbor_id,
+                    tile.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn geodesic_no_self_neighbors() {
+        let tiles = generate_geodesic_grid(3);
+        for tile in &tiles {
+            assert!(
+                !tile.neighbors.contains(&tile.id),
+                "Tile {} is its own neighbor",
+                tile.id
+            );
+        }
+    }
+
+    #[test]
+    fn geodesic_no_duplicate_neighbors() {
+        let tiles = generate_geodesic_grid(3);
+        for tile in &tiles {
+            let unique: HashSet<u32> = tile.neighbors.iter().copied().collect();
+            assert_eq!(
+                unique.len(),
+                tile.neighbors.len(),
+                "Tile {} has duplicate neighbors",
+                tile.id
+            );
+        }
+    }
+
+    #[test]
+    fn geodesic_all_tiles_reachable() {
+        let tiles = generate_geodesic_grid(3);
+        let total = tiles.len();
+        let mut visited = vec![false; total];
+        let mut queue = VecDeque::new();
+        queue.push_back(0u32);
+        visited[0] = true;
+        let mut count = 1;
+
+        while let Some(id) = queue.pop_front() {
+            for &neighbor_id in &tiles[id as usize].neighbors {
+                if !visited[neighbor_id as usize] {
+                    visited[neighbor_id as usize] = true;
+                    count += 1;
+                    queue.push_back(neighbor_id);
+                }
+            }
+        }
+
+        assert_eq!(
+            count, total,
+            "Only {} of {} geodesic tiles reachable from tile 0",
+            count, total
+        );
+    }
+
+    #[test]
+    fn geodesic_positions_on_unit_sphere() {
+        let tiles = generate_geodesic_grid(3);
+        for tile in &tiles {
+            let p = &tile.position;
+            let r_sq = p.x * p.x + p.y * p.y + p.z * p.z;
+            assert!(
+                (r_sq - 1.0).abs() < 1e-6,
+                "Tile {} not on unit sphere: x²+y²+z² = {}",
+                tile.id,
+                r_sq
+            );
+        }
+    }
+
+    #[test]
+    fn geodesic_lat_lon_ranges() {
+        let tiles = generate_geodesic_grid(3);
+        for tile in &tiles {
+            assert!(
+                tile.position.lat >= -90.0 && tile.position.lat <= 90.0,
+                "Tile {} lat out of range: {}",
+                tile.id,
+                tile.position.lat
+            );
+            assert!(
+                tile.position.lon >= -180.0 && tile.position.lon <= 180.0,
+                "Tile {} lon out of range: {}",
+                tile.id,
+                tile.position.lon
+            );
+        }
+    }
+
+    #[test]
+    fn geodesic_is_deterministic() {
+        let tiles1 = generate_geodesic_grid(3);
+        let tiles2 = generate_geodesic_grid(3);
         assert_eq!(tiles1.len(), tiles2.len());
         for (t1, t2) in tiles1.iter().zip(tiles2.iter()) {
             assert_eq!(t1.id, t2.id);

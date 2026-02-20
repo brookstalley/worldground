@@ -35,11 +35,12 @@ Full world state sent once when a client connects.
   "season": "Summer",
   "season_length": 90,
   "tile_count": 16000,
+  "topology_type": "FlatHex",
   "tiles": [
     {
       "id": 0,
       "neighbors": [1, 2, 3, 4, 5, 6],
-      "position": { "x": 0.0, "y": 0.0 },
+      "position": { "x": 0.0, "y": 0.0, "z": 0.0, "lat": 45.0, "lon": -90.0 },
       "geology": { "terrain_type": "Plains", "elevation": 0.3, "soil_type": "Loam", "drainage": 0.5, "tectonic_stress": 0.1 },
       "climate": { "zone": "Temperate", "base_temperature": 288.15, "base_precipitation": 0.5, "latitude": 0.2 },
       "biome": { "biome_type": "Grassland", "vegetation_density": 0.6, "vegetation_health": 0.8, "transition_pressure": 0.0, "ticks_in_current_biome": 100 },

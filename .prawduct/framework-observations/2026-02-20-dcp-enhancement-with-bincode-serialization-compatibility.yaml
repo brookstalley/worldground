@@ -1,0 +1,21 @@
+---
+observation_id: 49a0836d-2034-496f-a8e4-e920006417b3
+timestamp: 2026-02-20T21:56:58Z
+session_type: product_use
+session_context:
+  product_classification: "entertainment, low-risk, has_human_interface+runs_unattended+exposes_programmatic_interface"
+  framework_version: 0bdcabd
+observations:
+  - type: process_friction
+    stage: 6
+    severity: warning
+    description: "DCP Enhancement with bincode serialization compatibility: tagged serde enums (serde(tag=type)) are incompatible with bincode deserialization (deserialize_any not supported). Config structs that must serialize to both TOML and bincode should use flat structs with string mode fields instead of tagged enums."
+    evidence: "TopologyConfig initially implemented as tagged enum caused 4 snapshot persistence test failures. Changed to flat struct with mode: String field to support both TOML and bincode."
+    status: acted_on
+    root_cause_analysis:
+      symptom: "bincode deserialization fails on serde tagged enums with deserialize_any error"
+      root_cause: "serde tagged enums require deserialize_any which bincode does not implement; config types that participate in both human-readable (TOML/JSON) and binary (bincode) serialization need enum-free representations"
+      category: wrong_abstraction
+skills_affected:
+  - "agents/artifact-generator/SKILL.md"
+---

@@ -6,7 +6,7 @@
 - **Framework:** Rust built-in test framework (`#[test]`, `#[tokio::test]`)
 - **Dev dependencies:** `tempfile` (temporary directories for rule engine tests)
 - **Run:** `cargo test` (all tests), `cargo test --release` (with optimizations for performance tests)
-- **Test location:** Inline `#[cfg(test)] mod tests` in each source file (12 files, 118 tests total)
+- **Test location:** Inline `#[cfg(test)] mod tests` in each source file (12 files, 141 tests total)
 
 ## Test Coverage by Module
 
@@ -31,7 +31,7 @@
 | xorshift64_deterministic | PRNG is reproducible given same seed |
 | tile_to_map_has_all_layers | Rhai map includes all 6 tile layers |
 
-### Simulation Loop (src/simulation/mod.rs) — 12 tests
+### Simulation Loop (src/simulation/mod.rs) — 14 tests
 | Test | What it validates |
 |------|-------------------|
 | single_tick_produces_state_changes | One tick modifies world state |
@@ -43,6 +43,8 @@
 | multi_tick_evolution_400_ticks | Full year produces biome transitions and diversity changes |
 | established_biome_resists_change | Old biomes resist transition more than young ones |
 | cascade_detection_with_failing_rules | >10% tile errors triggers warning |
+| geodesic_world_multi_tick_no_errors | 42-tile geodesic world runs 20 ticks with neighbor_avg rule, 0 errors |
+| geodesic_pentagon_tiles_simulate_correctly | 12 pentagons + 30 hexagons verified, 10 ticks with neighbor averaging, valid temperatures |
 | performance_10k_tiles_100_ticks | ≤1000ms/tick at 10K tiles (release) |
 | per_phase_timing_within_budget | Each phase within its timing budget |
 | memory_estimate_10k_tiles_under_50mb | Peak memory under 50MB for 10K tiles |
@@ -76,11 +78,11 @@ Tests biome distribution, diversity index, average calculations, and statistics 
 | tick_diff_serializes_to_json | Diff JSON valid, null layers omitted |
 | health_status_serializes | Health endpoint JSON valid |
 
-### World (src/world/tile.rs + generation.rs + topology.rs) — 26 tests
-Tests tile creation, serde round-trip, season cycling, enum serialization, world generation determinism, biome distribution, climate bands, topology neighbors, hex grid edge cases.
+### World (src/world/tile.rs + generation.rs + topology.rs) — 37 tests
+Tests tile creation, serde round-trip, season cycling, enum serialization, world generation determinism, biome distribution, climate bands, topology neighbors, hex grid edge cases, and geodesic sphere generation (tile counts, pentagon count, bidirectional neighbors, BFS reachability, unit sphere positions, lat/lon ranges, determinism). Includes 3 geodesic generation integration tests: `generate_geodesic_world_correct_tile_count` (level 1 → 42 tiles), `generate_geodesic_world_all_layers_populated` (level 2 → 162 tiles, all layers valid), `geodesic_climate_follows_latitude` (level 3 → 642 tiles, polar/tropical zones correct).
 
 ### Config (src/config/generation.rs + simulation.rs) — 20 tests
-Tests TOML parsing, default values, validation, error handling for both config files.
+Tests TOML parsing, default values, validation, error handling for both config files including TopologyConfig defaults and validation.
 
 ### Persistence (src/persistence/snapshot.rs) — 19 tests
 Tests snapshot save/load round-trip, directory management, listing, pruning, error cases.

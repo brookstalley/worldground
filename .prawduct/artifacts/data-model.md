@@ -23,19 +23,31 @@ The top-level container for all simulation state.
 
 ## Tile
 
-Each hex tile has an ID, position, neighbor list, and 6 data layers.
+Each tile has an ID, position, neighbor list, and 6 data layers. Tiles may be hexagons (flat grid) or a mix of hexagons and pentagons (geodesic).
 
 | Field | Type | Description |
 |-------|------|-------------|
 | id | u32 | Unique tile identifier |
 | neighbors | Vec&lt;u32&gt; | IDs of adjacent tiles |
-| position | Position | x, y coordinates |
+| position | Position | 3D position with lat/lon |
 | geology | GeologyLayer | Immutable terrain data |
 | climate | ClimateLayer | Immutable climate data |
 | biome | BiomeLayer | Mutable ecological state |
 | resources | ResourceLayer | Mutable resource deposits |
 | weather | WeatherLayer | Mutable weather state |
 | conditions | ConditionsLayer | Mutable ground conditions |
+
+## Position
+
+| Field | Type | Description |
+|-------|------|-------------|
+| x | f64 | X coordinate (unit sphere for geodesic, pixel offset for flat) |
+| y | f64 | Y coordinate |
+| z | f64 | Z coordinate (0.0 for flat) |
+| lat | f64 | Latitude in degrees (-90 to 90). Populated for both topologies. |
+| lon | f64 | Longitude in degrees (-180 to 180). Populated for both topologies. |
+
+Constructor: `Position::flat(x, y)` creates a flat-grid position (z=0, lat/lon=0 until climate assignment populates them).
 
 ## Layers
 
@@ -134,6 +146,13 @@ None, Rain, Snow, Hail, Sleet
 | climate_bands | bool | true | Use latitude-based climate zones |
 | resource_density | f32 | 0.3 | Resource scattering density |
 | initial_biome_maturity | f32 | 0.5 | Initial biome establishment level |
+| topology | TopologyConfig | (see below) | Grid topology configuration |
+
+### TopologyConfig
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| mode | String | "flat" | "flat" (hex grid) or "geodesic" (icosphere) |
+| subdivision_level | u32 | 4 | Geodesic only: 1-7. Tile count = 10 * 4^level + 2 |
 
 ## Serialization
 - **Persistence:** Bincode (binary, compact, fast) for snapshots

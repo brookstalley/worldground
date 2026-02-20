@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::config::generation::GenerationParams;
 use crate::world::tile::*;
-use crate::world::topology::{generate_flat_hex_grid, grid_dimensions};
+use crate::world::topology::{generate_flat_hex_grid, generate_geodesic_grid, grid_dimensions};
 use crate::world::World;
 
 /// Generate a new world from the given parameters.
@@ -26,14 +26,27 @@ pub fn generate_world(params: &GenerationParams) -> World {
     };
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-    let (width, height) = grid_dimensions(params.tile_count);
-    let mut tiles = generate_flat_hex_grid(width, height);
+    let (mut tiles, topology_type) = if params.topology.is_geodesic() {
+        let tiles = generate_geodesic_grid(params.topology.subdivision_level);
+        (tiles, TopologyType::Geodesic)
+    } else {
+        let (width, height) = grid_dimensions(params.tile_count);
+        let tiles = generate_flat_hex_grid(width, height);
+        (tiles, TopologyType::FlatHex)
+    };
     let actual_count = tiles.len() as u32;
 
-    generate_elevation(&mut tiles, seed as u32, params.elevation_roughness);
+    let is_geodesic = topology_type == TopologyType::Geodesic;
+    generate_elevation(&mut tiles, seed as u32, params.elevation_roughness, is_geodesic);
     assign_terrain_types(&mut tiles, params.ocean_ratio, params.mountain_ratio);
-    assign_climate(&mut tiles, height, params.climate_bands);
-    assign_soil(&mut tiles, seed.wrapping_add(1) as u32);
+    if is_geodesic {
+        // Geodesic tiles already have lat/lon from Phase 1; assign climate from those.
+        assign_climate_from_lat(&mut tiles, params.climate_bands);
+    } else {
+        let (_, height) = grid_dimensions(params.tile_count);
+        assign_climate(&mut tiles, height, params.climate_bands);
+    }
+    assign_soil(&mut tiles, seed.wrapping_add(1) as u32, is_geodesic);
     assign_initial_biomes(&mut tiles, params.initial_biome_maturity);
     scatter_resources(&mut tiles, &mut rng, params.resource_density);
     initialize_weather(&mut tiles, &mut rng);
@@ -55,7 +68,7 @@ pub fn generate_world(params: &GenerationParams) -> World {
         season: Season::Spring,
         season_length: 90,
         tile_count: actual_count,
-        topology_type: TopologyType::FlatHex,
+        topology_type,
         generation_params: resolved_params,
         snapshot_path: None,
         tiles,
@@ -137,14 +150,28 @@ pub fn print_world_summary(world: &World) {
 
 // --- Internal generation functions ---
 
-fn generate_elevation(tiles: &mut [Tile], seed: u32, roughness: f32) {
+fn generate_elevation(tiles: &mut [Tile], seed: u32, roughness: f32, is_geodesic: bool) {
     let perlin = Perlin::new(seed);
-    let scale = 0.08;
-    for tile in tiles.iter_mut() {
-        let nx = tile.position.x * scale;
-        let ny = tile.position.y * scale;
-        let e = perlin.get([nx, ny]) as f32;
-        tile.geology.elevation = (e * roughness).clamp(-1.0, 1.0);
+    if is_geodesic {
+        // 3D Perlin noise sampled at unit sphere positions
+        let scale = 3.0;
+        for tile in tiles.iter_mut() {
+            let e = perlin.get([
+                tile.position.x * scale,
+                tile.position.y * scale,
+                tile.position.z * scale,
+            ]) as f32;
+            tile.geology.elevation = (e * roughness).clamp(-1.0, 1.0);
+        }
+    } else {
+        // 2D Perlin noise for flat hex grid
+        let scale = 0.08;
+        for tile in tiles.iter_mut() {
+            let nx = tile.position.x * scale;
+            let ny = tile.position.y * scale;
+            let e = perlin.get([nx, ny]) as f32;
+            tile.geology.elevation = (e * roughness).clamp(-1.0, 1.0);
+        }
     }
 }
 
@@ -234,6 +261,47 @@ fn assign_terrain_types(tiles: &mut [Tile], ocean_ratio: f32, mountain_ratio: f3
     }
 }
 
+/// Assign climate for geodesic tiles using lat/lon already set in position.
+fn assign_climate_from_lat(tiles: &mut [Tile], use_bands: bool) {
+    for tile in tiles.iter_mut() {
+        let latitude = tile.position.lat as f32;
+        tile.climate.latitude = latitude;
+
+        if use_bands {
+            let abs_lat = latitude.abs();
+            tile.climate.zone = if abs_lat > 60.0 {
+                ClimateZone::Polar
+            } else if abs_lat > 45.0 {
+                ClimateZone::Subpolar
+            } else if abs_lat > 30.0 {
+                ClimateZone::Temperate
+            } else if abs_lat > 15.0 {
+                ClimateZone::Subtropical
+            } else {
+                ClimateZone::Tropical
+            };
+        }
+
+        let zone_temp = match tile.climate.zone {
+            ClimateZone::Polar => 250.0,
+            ClimateZone::Subpolar => 265.0,
+            ClimateZone::Temperate => 283.0,
+            ClimateZone::Subtropical => 295.0,
+            ClimateZone::Tropical => 300.0,
+        };
+        let elevation_effect = tile.geology.elevation.max(0.0) * 20.0;
+        tile.climate.base_temperature = zone_temp - elevation_effect;
+
+        tile.climate.base_precipitation = match tile.climate.zone {
+            ClimateZone::Polar => 0.2,
+            ClimateZone::Subpolar => 0.3,
+            ClimateZone::Temperate => 0.5,
+            ClimateZone::Subtropical => 0.4,
+            ClimateZone::Tropical => 0.7,
+        };
+    }
+}
+
 fn assign_climate(tiles: &mut [Tile], grid_height: u32, use_bands: bool) {
     let max_y = 1.5 * (grid_height.saturating_sub(1)) as f64;
 
@@ -244,6 +312,15 @@ fn assign_climate(tiles: &mut [Tile], grid_height: u32, use_bands: bool) {
             0.0
         };
         tile.climate.latitude = latitude;
+        // Populate lat/lon on flat-mode positions so weather rules
+        // can use spherical math uniformly across both topologies.
+        tile.position.lat = latitude as f64;
+        let max_x = 3.0_f64.sqrt() * (grid_height as f64); // approximate
+        tile.position.lon = if max_x > 0.0 {
+            (tile.position.x / max_x) * 360.0 - 180.0
+        } else {
+            0.0
+        };
 
         if use_bands {
             let abs_lat = latitude.abs();
@@ -281,9 +358,9 @@ fn assign_climate(tiles: &mut [Tile], grid_height: u32, use_bands: bool) {
     }
 }
 
-fn assign_soil(tiles: &mut [Tile], seed: u32) {
+fn assign_soil(tiles: &mut [Tile], seed: u32, is_geodesic: bool) {
     let perlin = Perlin::new(seed);
-    let scale = 0.12;
+    let scale = if is_geodesic { 3.0 } else { 0.12 };
 
     for tile in tiles.iter_mut() {
         match tile.geology.terrain_type {
@@ -305,7 +382,15 @@ fn assign_soil(tiles: &mut [Tile], seed: u32) {
             _ => {}
         }
 
-        let n = perlin.get([tile.position.x * scale, tile.position.y * scale]) as f32;
+        let n = if is_geodesic {
+            perlin.get([
+                tile.position.x * scale,
+                tile.position.y * scale,
+                tile.position.z * scale,
+            ]) as f32
+        } else {
+            perlin.get([tile.position.x * scale, tile.position.y * scale]) as f32
+        };
         let (soil, drainage) = if n < -0.4 {
             (SoilType::Sand, 0.8)
         } else if n < -0.1 {
@@ -518,6 +603,7 @@ fn initialize_conditions(tiles: &mut [Tile]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::generation::TopologyConfig;
 
     fn default_params() -> GenerationParams {
         GenerationParams {
@@ -529,6 +615,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: TopologyConfig::default(),
         }
     }
 
@@ -745,6 +832,120 @@ mod tests {
             .map(|t| t.resources.resources.len())
             .sum();
         assert!(total_resources > 0, "Expected some resources");
+    }
+
+    fn geodesic_params(level: u32) -> GenerationParams {
+        GenerationParams {
+            seed: 42,
+            tile_count: 1000, // ignored for geodesic; tile count comes from subdivision level
+            ocean_ratio: 0.6,
+            mountain_ratio: 0.1,
+            elevation_roughness: 0.5,
+            climate_bands: true,
+            resource_density: 0.3,
+            initial_biome_maturity: 0.5,
+            topology: TopologyConfig {
+                mode: "geodesic".to_string(),
+                subdivision_level: level,
+            },
+        }
+    }
+
+    #[test]
+    fn generate_geodesic_world_correct_tile_count() {
+        let world = generate_world(&geodesic_params(1));
+        assert_eq!(
+            world.tiles.len(),
+            42,
+            "Level 1 geodesic should have 42 tiles, got {}",
+            world.tiles.len()
+        );
+        assert_eq!(world.topology_type, TopologyType::Geodesic);
+    }
+
+    #[test]
+    fn generate_geodesic_world_all_layers_populated() {
+        let world = generate_world(&geodesic_params(2));
+        assert_eq!(
+            world.tiles.len(),
+            162,
+            "Level 2 geodesic should have 162 tiles, got {}",
+            world.tiles.len()
+        );
+        for tile in &world.tiles {
+            assert!(
+                tile.geology.elevation >= -1.0 && tile.geology.elevation <= 1.0,
+                "Tile {} elevation out of range: {}",
+                tile.id,
+                tile.geology.elevation
+            );
+            assert!(
+                tile.position.lat >= -90.0 && tile.position.lat <= 90.0,
+                "Tile {} lat out of range: {}",
+                tile.id,
+                tile.position.lat
+            );
+            assert!(
+                tile.position.lon >= -180.0 && tile.position.lon <= 180.0,
+                "Tile {} lon out of range: {}",
+                tile.id,
+                tile.position.lon
+            );
+            assert!(
+                tile.climate.latitude >= -90.0 && tile.climate.latitude <= 90.0,
+                "Tile {} climate latitude out of range: {}",
+                tile.id,
+                tile.climate.latitude
+            );
+            assert!(
+                tile.climate.base_temperature > 200.0,
+                "Tile {} base temperature too low: {}",
+                tile.id,
+                tile.climate.base_temperature
+            );
+        }
+    }
+
+    #[test]
+    fn geodesic_climate_follows_latitude() {
+        let world = generate_world(&geodesic_params(3));
+        assert_eq!(
+            world.tiles.len(),
+            642,
+            "Level 3 geodesic should have 642 tiles, got {}",
+            world.tiles.len()
+        );
+
+        let mut polar_found = false;
+        let mut tropical_found = false;
+
+        for tile in &world.tiles {
+            let abs_lat = tile.position.lat.abs();
+            if abs_lat > 60.0 {
+                assert_eq!(
+                    tile.climate.zone,
+                    ClimateZone::Polar,
+                    "Geodesic tile {} at lat {:.1} should be Polar, got {:?}",
+                    tile.id,
+                    tile.position.lat,
+                    tile.climate.zone
+                );
+                polar_found = true;
+            }
+            if abs_lat < 15.0 {
+                assert_eq!(
+                    tile.climate.zone,
+                    ClimateZone::Tropical,
+                    "Geodesic tile {} at lat {:.1} should be Tropical, got {:?}",
+                    tile.id,
+                    tile.position.lat,
+                    tile.climate.zone
+                );
+                tropical_found = true;
+            }
+        }
+        assert!(polar_found, "Geodesic world should have polar tiles");
+        assert!(tropical_found, "Geodesic world should have tropical tiles");
     }
 
     #[test]

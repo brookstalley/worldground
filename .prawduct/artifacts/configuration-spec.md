@@ -31,6 +31,14 @@
 | resource_density | f32 | 0.3 | 0.0-1.0 | Resource scattering density |
 | initial_biome_maturity | f32 | 0.5 | 0.0-1.0 | Initial biome establishment level |
 
+### Optional: [topology] section
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| mode | String | "flat" | "flat" or "geodesic" | Grid topology type |
+| subdivision_level | u32 | 4 | 1-7 | Geodesic icosphere subdivision level. Tile count = 10 * 4^level + 2. Level 4 = 2,562 tiles. |
+
+If the `[topology]` section is omitted, defaults to flat hex grid.
+
 ## CLI Overrides
 
 The `run` subcommand accepts overrides for simulation config:

@@ -369,7 +369,7 @@ dev_tools:
 build_state:
   source_root: "src/"
   test_tracking:
-    test_count: 118
+    test_count: 141
     assertion_count: 0
     test_files:
       - "src/simulation/engine.rs"

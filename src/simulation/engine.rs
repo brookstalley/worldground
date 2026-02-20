@@ -857,7 +857,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn make_test_tile() -> Tile {
-        Tile::new_default(0, vec![1, 2, 3, 4, 5, 6], Position { x: 0.0, y: 0.0 })
+        Tile::new_default(0, vec![1, 2, 3, 4, 5, 6], Position::flat(0.0, 0.0))
     }
 
     fn make_rule_dir(dir: &Path, phase: &str, rules: &[(&str, &str)]) {

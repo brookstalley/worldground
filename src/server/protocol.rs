@@ -15,6 +15,7 @@ pub struct WorldSnapshot {
     pub season: Season,
     pub season_length: u32,
     pub tile_count: u32,
+    pub topology_type: TopologyType,
     pub tiles: Vec<TileSnapshot>,
 }
 
@@ -90,6 +91,7 @@ impl WorldSnapshot {
             season: world.season,
             season_length: world.season_length,
             tile_count: world.tile_count,
+            topology_type: world.topology_type,
             tiles: world.tiles.iter().map(TileSnapshot::from_tile).collect(),
         }
     }
@@ -176,7 +178,7 @@ mod tests {
     use crate::world::tile::{Position, Tile};
 
     fn make_tile(id: u32) -> Tile {
-        Tile::new_default(id, vec![], Position { x: 0.0, y: 0.0 })
+        Tile::new_default(id, vec![], Position::flat(0.0, 0.0))
     }
 
     #[test]
@@ -199,6 +201,7 @@ mod tests {
                 climate_bands: true,
                 resource_density: 0.3,
                 initial_biome_maturity: 0.5,
+                topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
             tiles: vec![make_tile(0), make_tile(1), make_tile(2)],
@@ -233,6 +236,7 @@ mod tests {
                 climate_bands: true,
                 resource_density: 0.3,
                 initial_biome_maturity: 0.5,
+                topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
             tiles: vec![make_tile(0)],
@@ -242,6 +246,7 @@ mod tests {
         let json = serde_json::to_string(&snapshot).expect("serialization should succeed");
         assert!(json.contains("\"message_type\":\"WorldSnapshot\""));
         assert!(json.contains("\"name\":\"json_test\""));
+        assert!(json.contains("\"topology_type\":\"FlatHex\""));
     }
 
     #[test]

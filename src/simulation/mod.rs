@@ -109,6 +109,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: crate::config::generation::TopologyConfig::default(),
         }
     }
 
@@ -597,7 +598,7 @@ mod tests {
                     let mut t = crate::world::Tile::new_default(
                         0,
                         vec![],
-                        Position { x: 0.0, y: 0.0 },
+                        Position::flat(0.0, 0.0),
                     );
                     t.biome.biome_type = BiomeType::Grassland;
                     t.biome.ticks_in_current_biome = 0; // young
@@ -607,7 +608,7 @@ mod tests {
                     let mut t = crate::world::Tile::new_default(
                         1,
                         vec![],
-                        Position { x: 1.0, y: 0.0 },
+                        Position::flat(1.0, 0.0),
                     );
                     t.biome.biome_type = BiomeType::Grassland;
                     t.biome.ticks_in_current_biome = 1000; // established
@@ -864,6 +865,128 @@ mod tests {
             assert!(avg_terrain <= 200.0_f32.max(rhai_floor), "Terrain avg {:.1}ms > {:.0}ms", avg_terrain, 200.0_f32.max(rhai_floor));
             assert!(avg_resources <= 50.0_f32.max(rhai_floor), "Resources avg {:.1}ms > {:.0}ms", avg_resources, 50.0_f32.max(rhai_floor));
             assert!(avg_stats <= 50.0, "Statistics avg {:.1}ms > 50ms", avg_stats);
+        }
+    }
+
+    fn geodesic_gen_params(level: u32) -> GenerationParams {
+        GenerationParams {
+            seed: 42,
+            tile_count: 1000,
+            ocean_ratio: 0.3,
+            mountain_ratio: 0.1,
+            elevation_roughness: 0.5,
+            climate_bands: true,
+            resource_density: 0.3,
+            initial_biome_maturity: 0.5,
+            topology: crate::config::generation::TopologyConfig {
+                mode: "geodesic".to_string(),
+                subdivision_level: level,
+            },
+        }
+    }
+
+    #[test]
+    fn geodesic_world_multi_tick_no_errors() {
+        let dir = TempDir::new().unwrap();
+        setup_empty_rule_dirs(dir.path());
+
+        // Weather rule that uses neighbor_avg to exercise neighbor lookups
+        make_rule_dir(
+            dir.path(),
+            "weather",
+            &[(
+                "01-temp.rhai",
+                r#"
+                let avg_t = neighbor_avg(neighbors, "weather.temperature");
+                let base = tile.climate.base_temperature;
+                set("temperature", base * 0.7 + avg_t * 0.3);
+                "#,
+            )],
+        );
+
+        let engine = RuleEngine::new(dir.path(), 100).unwrap();
+        let mut world = generate_world(&geodesic_gen_params(1));
+        assert_eq!(world.tiles.len(), 42);
+
+        let mut total_errors = 0;
+        for _ in 0..20 {
+            let result = execute_tick(&mut world, &engine, 100);
+            total_errors += result.rule_errors.len();
+        }
+
+        assert_eq!(
+            total_errors, 0,
+            "Geodesic simulation should produce 0 rule errors over 20 ticks, got {}",
+            total_errors
+        );
+        assert_eq!(world.tick_count, 20);
+    }
+
+    #[test]
+    fn geodesic_pentagon_tiles_simulate_correctly() {
+        let dir = TempDir::new().unwrap();
+        setup_empty_rule_dirs(dir.path());
+
+        // Rule that averages neighbor temperatures — exercises 5-neighbor pentagons
+        make_rule_dir(
+            dir.path(),
+            "weather",
+            &[(
+                "01-neighbor-avg.rhai",
+                r#"
+                let avg_t = neighbor_avg(neighbors, "weather.temperature");
+                set("temperature", avg_t);
+                "#,
+            )],
+        );
+
+        let engine = RuleEngine::new(dir.path(), 100).unwrap();
+        let mut world = generate_world(&geodesic_gen_params(1));
+
+        // Level 1: 12 pentagons (5 neighbors) + 30 hexagons (6 neighbors) = 42 tiles
+        let pentagon_count = world
+            .tiles
+            .iter()
+            .filter(|t| t.neighbors.len() == 5)
+            .count();
+        let hexagon_count = world
+            .tiles
+            .iter()
+            .filter(|t| t.neighbors.len() == 6)
+            .count();
+
+        assert_eq!(
+            pentagon_count, 12,
+            "Level 1 geodesic should have 12 pentagons, got {}",
+            pentagon_count
+        );
+        assert_eq!(
+            hexagon_count, 30,
+            "Level 1 geodesic should have 30 hexagons, got {}",
+            hexagon_count
+        );
+
+        // Run 10 ticks
+        let mut total_errors = 0;
+        for _ in 0..10 {
+            let result = execute_tick(&mut world, &engine, 100);
+            total_errors += result.rule_errors.len();
+        }
+
+        assert_eq!(
+            total_errors, 0,
+            "Pentagon tiles should simulate without errors, got {} errors",
+            total_errors
+        );
+
+        // Pentagon tiles should have valid temperatures
+        for tile in world.tiles.iter().filter(|t| t.neighbors.len() == 5) {
+            assert!(
+                tile.weather.temperature > 200.0 && tile.weather.temperature < 350.0,
+                "Pentagon tile {} has out-of-range temperature: {}",
+                tile.id,
+                tile.weather.temperature
+            );
         }
     }
 

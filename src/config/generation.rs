@@ -1,6 +1,42 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+/// Topology configuration: flat hex grid or geodesic sphere.
+///
+/// Uses a flat struct (not a tagged enum) for bincode + TOML compatibility.
+/// `mode` is "flat" (default) or "geodesic".
+/// `subdivision_level` is only used in geodesic mode (1-7, default 4).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TopologyConfig {
+    #[serde(default = "default_mode")]
+    pub mode: String,
+    #[serde(default = "default_subdivision_level")]
+    pub subdivision_level: u32,
+}
+
+fn default_mode() -> String {
+    "flat".to_string()
+}
+
+fn default_subdivision_level() -> u32 {
+    4
+}
+
+impl TopologyConfig {
+    pub fn is_geodesic(&self) -> bool {
+        self.mode == "geodesic"
+    }
+}
+
+impl Default for TopologyConfig {
+    fn default() -> Self {
+        TopologyConfig {
+            mode: "flat".to_string(),
+            subdivision_level: 4,
+        }
+    }
+}
+
 /// Parameters used to procedurally generate a world.
 /// Stored with the world for reproducibility.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -13,6 +49,8 @@ pub struct GenerationParams {
     pub climate_bands: bool,
     pub resource_density: f32,
     pub initial_biome_maturity: f32,
+    #[serde(default)]
+    pub topology: TopologyConfig,
 }
 
 impl GenerationParams {
@@ -64,6 +102,18 @@ impl GenerationParams {
                 self.initial_biome_maturity
             ));
         }
+        if self.topology.mode != "flat" && self.topology.mode != "geodesic" {
+            return Err(format!(
+                "topology.mode must be 'flat' or 'geodesic', got '{}'",
+                self.topology.mode
+            ));
+        }
+        if self.topology.is_geodesic() && !(1..=7).contains(&self.topology.subdivision_level) {
+            return Err(format!(
+                "subdivision_level must be 1-7, got {}",
+                self.topology.subdivision_level
+            ));
+        }
         Ok(())
     }
 }
@@ -84,6 +134,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: TopologyConfig::default(),
         };
         assert!(params.validate().is_ok());
     }
@@ -99,6 +150,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: TopologyConfig::default(),
         };
         let err = params.validate().unwrap_err();
         assert!(
@@ -119,6 +171,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: TopologyConfig::default(),
         };
         let err = params.validate().unwrap_err();
         assert!(
@@ -139,6 +192,7 @@ mod tests {
             climate_bands: true,
             resource_density: 0.3,
             initial_biome_maturity: 0.5,
+            topology: TopologyConfig::default(),
         };
         let err = params.validate().unwrap_err();
         assert!(
