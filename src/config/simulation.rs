@@ -38,7 +38,7 @@ fn default_snapshot_directory() -> String {
     "./snapshots".to_string()
 }
 fn default_websocket_port() -> u16 {
-    8080
+    8118
 }
 fn default_websocket_bind() -> String {
     "127.0.0.1".to_string()
@@ -96,7 +96,7 @@ impl SimulationConfig {
 
         if !(1024..=65535).contains(&self.websocket_port) {
             errors.push(format!(
-                "websocket_port must be 1024-65535, got {}. Example: websocket_port = 8080",
+                "websocket_port must be 1024-65535, got {}. Example: websocket_port = 8118",
                 self.websocket_port
             ));
         }
@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(config.snapshot_interval, 100);
         assert_eq!(config.max_snapshots, 10);
         assert_eq!(config.snapshot_directory, "./snapshots");
-        assert_eq!(config.websocket_port, 8080);
+        assert_eq!(config.websocket_port, 8118);
         assert_eq!(config.websocket_bind, "127.0.0.1");
         assert_eq!(config.rule_directory, "./rules");
         assert_eq!(config.log_level, "info");

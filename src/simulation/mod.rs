@@ -70,6 +70,14 @@ pub fn execute_tick(
             pct = (error_count as f64 / total_tiles as f64) * 100.0,
             "Rule cascade detected"
         );
+        if let Some(first) = all_errors.first() {
+            warn!(
+                tile_id = first.tile_id,
+                rule = %first.rule_name,
+                error = %first.error,
+                "First error detail"
+            );
+        }
     }
 
     TickResult {

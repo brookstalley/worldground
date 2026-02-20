@@ -22,7 +22,6 @@ pub struct WorldSnapshot {
 #[derive(Debug, Clone, Serialize)]
 pub struct TileSnapshot {
     pub id: u32,
-    pub neighbors: Vec<u32>,
     pub position: Position,
     pub geology: GeologyLayer,
     pub climate: ClimateLayer,
@@ -100,7 +99,6 @@ impl TileSnapshot {
     pub fn from_tile(tile: &Tile) -> Self {
         TileSnapshot {
             id: tile.id,
-            neighbors: tile.neighbors.clone(),
             position: tile.position,
             geology: tile.geology.clone(),
             climate: tile.climate.clone(),

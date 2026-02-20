@@ -95,7 +95,7 @@ impl RuleEngine {
         engine.set_max_operations(100_000);
         engine.set_max_string_size(1024);
         engine.set_max_array_size(1000);
-        engine.set_max_map_size(100);
+        engine.set_max_map_size(500);
 
         // Register the `set` function for tile mutations
         engine.register_fn("set", |field: &str, value: Dynamic| {

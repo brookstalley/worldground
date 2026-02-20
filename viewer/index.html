@@ -571,8 +571,9 @@ function updateStats(s) {
 // WebSocket connection
 // ============================================================
 function connect() {
+  // When served by the engine, use the same host:port. When opened as a file, fall back to query param.
   const host = location.hostname || 'localhost';
-  const port = new URLSearchParams(location.search).get('port') || '8080';
+  const port = location.port || new URLSearchParams(location.search).get('port') || '8118';
   const url = `ws://${host}:${port}`;
 
   setStatus('connecting');

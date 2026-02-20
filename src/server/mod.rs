@@ -174,7 +174,7 @@ pub async fn start_server(
     addr: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listener = TcpListener::bind(addr).await?;
-    info!(%addr, "Server listening");
+    info!(%addr, "Server listening — viewer at http://{}", addr);
 
     loop {
         let (stream, peer) = listener.accept().await?;
@@ -196,12 +196,15 @@ async fn handle_connection(
     // Peek at the first bytes to determine if this is a WebSocket upgrade or HTTP request
     let mut buf = [0u8; 512];
     let n = stream.peek(&mut buf).await?;
-    let request_line = String::from_utf8_lossy(&buf[..n]);
+    let request_line = String::from_utf8_lossy(&buf[..n]).to_lowercase();
 
-    if request_line.contains("GET /health") && !request_line.contains("Upgrade: websocket") {
+    if request_line.contains("upgrade: websocket") {
+        handle_websocket(stream, peer, state).await
+    } else if request_line.contains("get /health") {
         handle_health_request(stream, state).await
     } else {
-        handle_websocket(stream, peer, state).await
+        // Serve the viewer for any other HTTP request (GET /, GET /index.html, etc.)
+        handle_viewer_request(stream).await
     }
 }
 
@@ -253,6 +256,30 @@ async fn handle_websocket(
     }
 
     info!(%peer, "WebSocket disconnected");
+    Ok(())
+}
+
+/// Handle an HTTP request by serving the embedded viewer.
+async fn handle_viewer_request(
+    mut stream: TcpStream,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncWriteExt;
+
+    // Read and discard the full HTTP request
+    let mut buf = vec![0u8; 4096];
+    let _ = stream.read(&mut buf).await?;
+
+    const VIEWER_HTML: &str = include_str!("../../viewer/index.html");
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-cache\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        VIEWER_HTML.len(),
+        VIEWER_HTML
+    );
+
+    stream.write_all(response.as_bytes()).await?;
+    stream.shutdown().await?;
+
     Ok(())
 }
 

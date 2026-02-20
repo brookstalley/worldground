@@ -13,7 +13,7 @@ max_snapshots = 10
 snapshot_directory = "./snapshots"
 
 # WebSocket server settings
-websocket_port = 8080
+websocket_port = 8118
 websocket_bind = "127.0.0.1"
 
 # Path to Rhai rule script directories
