@@ -1,0 +1,412 @@
+# Project State — Worldground
+# Tier: 1 (Source of Truth)
+# Owner: Orchestrator
+
+schema_version: 2
+
+# =============================================================================
+# CLASSIFICATION
+# =============================================================================
+
+classification:
+  domain: entertainment
+
+  structural:
+    has_human_interface:
+      modality: screen
+      platform: web
+      notes: "Browser-based hex tile viewer (HTML/JS) + CLI for generation/management"
+    runs_unattended:
+      trigger: always-on
+      notes: "Simulation tick loop runs continuously once started"
+    exposes_programmatic_interface:
+      consumers: internal
+      notes: "WebSocket API streams world state to viewer; HTTP /health endpoint"
+    has_multiple_party_types: null
+    handles_sensitive_data: null
+
+  domain_characteristics:
+    - characteristic: "Scriptable simulation rules"
+      implications:
+        - "Rhai scripting engine must be sandboxed for safety"
+        - "Hot-reloadable rules without recompilation"
+        - "Rule execution is the primary performance bottleneck"
+    - characteristic: "Emergent systems from simple rules"
+      implications:
+        - "Weather, biome transitions, and ecological feedback loops"
+        - "Small rule changes can produce dramatic emergent behavior"
+        - "Determinism required for reproducibility"
+    - characteristic: "Real-time visualization"
+      implications:
+        - "WebSocket streaming of tile diffs for efficient updates"
+        - "Multiple overlay modes for different data layers"
+        - "Performance must support watchable tick rates at large world sizes"
+    - characteristic: "Procedural world generation"
+      implications:
+        - "Seed-based deterministic generation"
+        - "Perlin/simplex noise for terrain, latitude bands for climate"
+        - "Biome assignment from terrain + climate characteristics"
+
+  risk_profile:
+    overall: low
+    factors:
+      - factor: user-count
+        level: low
+        rationale: "Single-user local application"
+      - factor: data-sensitivity
+        level: low
+        rationale: "No user data — only generated simulation state"
+      - factor: failure-impact
+        level: low
+        rationale: "Restart simulation; snapshots enable recovery"
+      - factor: technical-complexity
+        level: medium
+        rationale: "Rhai scripting sandbox, rayon parallelism, WebSocket streaming, double-buffered simulation"
+
+# =============================================================================
+# PRODUCT DEFINITION
+# =============================================================================
+
+product_definition:
+  vision: "A perpetual world simulation engine that generates hex-tile worlds and evolves them through scriptable terrain, weather, and ecological rules — useful for game prototyping, systems exploration, and ambient visualization."
+
+  goals:
+    - "Generate diverse, believable hex-tile worlds from configurable parameters"
+    - "Simulate weather, conditions, terrain, and resource dynamics through user-modifiable Rhai rules"
+    - "Achieve watchable tick rates (1+ ticks/sec) at 16K tiles"
+    - "Provide real-time browser visualization with multiple data overlays"
+    - "Maintain full determinism given the same seed and rules"
+
+  users:
+    personas:
+      - name: "World Builder"
+        description: "Someone exploring procedural generation and emergent simulation systems — game developers, hobbyists, or educators."
+        technical_level: intermediate
+        primary_needs:
+          - "Generate and customize worlds"
+          - "Write and modify Rhai rules to create interesting dynamics"
+          - "Visualize simulation behavior in real time"
+        constraints: []
+
+  core_flows:
+    - name: "World Generation"
+      description: "Generate a new hex world from configurable parameters (seed, tile count, ratios)"
+      priority: must-have
+    - name: "Simulation Execution"
+      description: "Run the tick loop executing 4-phase Rhai rules: Weather → Conditions → Terrain → Resources"
+      priority: must-have
+    - name: "Real-time Visualization"
+      description: "Connect browser viewer via WebSocket, display hex map with overlay switching and tile inspection"
+      priority: must-have
+    - name: "Rule Authoring"
+      description: "Write/edit Rhai scripts in rules/<phase>/ to modify simulation behavior without recompilation"
+      priority: must-have
+    - name: "Snapshot Management"
+      description: "Auto-save and manually restore world state via bincode snapshots"
+      priority: must-have
+    - name: "World Inspection"
+      description: "CLI inspect command for tile-level and world-level state queries"
+      priority: nice-to-have
+
+  scope:
+    v1:
+      - "Hex world generation with configurable parameters"
+      - "4-phase simulation tick loop (Weather, Conditions, Terrain, Resources)"
+      - "10 Rhai rules across 4 phases"
+      - "Browser-based hex viewer with 9 overlay modes"
+      - "WebSocket real-time streaming with diff protocol"
+      - "HTTP health endpoint"
+      - "Bincode snapshot persistence with auto-save and pruning"
+      - "CLI: generate, run, inspect, snapshots (list/restore)"
+      - "Season cycling (Spring → Summer → Autumn → Winter)"
+      - "Biome adjacency-constrained transitions"
+      - "Rayon parallel tile evaluation"
+      - "Sandboxed Rhai engine with operation limits"
+      - "Deterministic simulation given same seed"
+    accommodate: []
+    later: []
+    never: []
+
+  product_identity:
+    name: "Worldground"
+    personality: "A sandbox for curious minds — technical but approachable, focused on emergence and exploration."
+    visual_preferences: "Hex map with distinct biome colors, gradient overlays for continuous data"
+
+  platform: "CLI + Web (browser viewer)"
+
+  nonfunctional:
+    performance: "1+ ticks/sec at 16K tiles (release build); ~8.5 ticks/sec at 1K tiles"
+    scalability: "Tile counts from 100 to 16K+; parallel evaluation scales with core count"
+    uptime: "Best-effort — local application, restart on failure"
+    cost_constraints: "Zero — fully local, no external services"
+
+  regulatory: []
+  cost_estimates: []
+
+# =============================================================================
+# TECHNICAL DECISIONS
+# =============================================================================
+
+technical_decisions:
+  architecture:
+    - decision: "Modular domain decomposition: world/, simulation/, server/, persistence/, config/, cli/"
+      rationale: "Existing codebase uses this structure — clean separation of concerns"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+    - decision: "Double-buffered tick execution: rules read from snapshot, write to mutable state"
+      rationale: "Existing codebase uses this — ensures evaluation order independence and enables parallelism"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+    - decision: "4-phase simulation pipeline: Weather → Conditions → Terrain → Resources"
+      rationale: "Existing codebase uses this — creates causal chains where each phase builds on the previous"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+
+  technology:
+    - decision: "Rust 2024 edition"
+      rationale: "Existing codebase — performance-critical simulation with memory safety"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+    - decision: "Rhai scripting engine for simulation rules"
+      rationale: "Existing codebase — embeddable, sandboxable, Rust-native scripting"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+    - decision: "Rayon for parallel tile evaluation"
+      rationale: "Existing codebase — work-stealing parallelism for data-parallel tile processing"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+    - decision: "Tokio + tokio-tungstenite for async WebSocket server"
+      rationale: "Existing codebase — async runtime for concurrent connection handling"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+    - decision: "Bincode for snapshot serialization"
+      rationale: "Existing codebase — compact binary format for fast save/load"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+
+  data_model:
+    - decision: "Tile-based world model with 6 typed layers (Geology, Climate, Weather, Conditions, Biome, Resources)"
+      rationale: "Existing codebase — separates immutable (generation-time) and mutable (simulation-time) data"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+
+  integrations: []
+
+  operational:
+    - decision: "Local-only operation — no network services, databases, or cloud dependencies"
+      rationale: "Existing codebase — simulation engine runs entirely on the local machine"
+      alternatives_considered: ["Inherited — project already built with this choice"]
+      date: 2026-02-20
+
+# =============================================================================
+# DESIGN DECISIONS
+# =============================================================================
+
+design_decisions:
+  information_architecture:
+    - decision: "Single-page hex viewer with overlay selector, zoom/pan, and tile click-to-inspect"
+      rationale: "Existing codebase — minimal UI focused on visualization"
+      date: 2026-02-20
+  interaction_patterns:
+    - decision: "CLI for world management, browser for visualization"
+      rationale: "Existing codebase — separation of control (CLI) and observation (viewer)"
+      date: 2026-02-20
+  accessibility_approach: null
+  visual_direction: "Hex map with distinct biome coloring, gradient overlays for temperature/humidity/elevation/etc."
+
+# =============================================================================
+# ARTIFACT MANIFEST
+# =============================================================================
+
+artifact_manifest:
+  artifacts:
+    - name: "Product Brief"
+      file_path: ".prawduct/artifacts/product-brief.md"
+      version: 1
+      depends_on: []
+      depended_on_by: ["Build Plan", "Test Specifications"]
+      last_validated: 2026-02-20
+      tier: 1
+    - name: "Data Model"
+      file_path: ".prawduct/artifacts/data-model.md"
+      version: 1
+      depends_on: ["Product Brief"]
+      depended_on_by: ["Test Specifications", "Build Plan"]
+      last_validated: 2026-02-20
+      tier: 1
+    - name: "Test Specifications"
+      file_path: ".prawduct/artifacts/test-specifications.md"
+      version: 1
+      depends_on: ["Product Brief", "Data Model"]
+      depended_on_by: []
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "Security Model"
+      file_path: ".prawduct/artifacts/security-model.md"
+      version: 1
+      depends_on: ["Product Brief"]
+      depended_on_by: []
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "Non-functional Requirements"
+      file_path: ".prawduct/artifacts/nonfunctional-requirements.md"
+      version: 1
+      depends_on: ["Product Brief"]
+      depended_on_by: ["Test Specifications"]
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "Operational Spec"
+      file_path: ".prawduct/artifacts/operational-spec.md"
+      version: 1
+      depends_on: ["Product Brief"]
+      depended_on_by: []
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "Dependency Manifest"
+      file_path: ".prawduct/artifacts/dependency-manifest.md"
+      version: 1
+      depends_on: []
+      depended_on_by: ["Build Plan"]
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "WebSocket API Spec"
+      file_path: ".prawduct/artifacts/websocket-api-spec.md"
+      version: 1
+      depends_on: ["Data Model"]
+      depended_on_by: ["Test Specifications"]
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "Configuration Spec"
+      file_path: ".prawduct/artifacts/configuration-spec.md"
+      version: 1
+      depends_on: ["Product Brief"]
+      depended_on_by: []
+      last_validated: 2026-02-20
+      tier: 2
+    - name: "Build Plan"
+      file_path: ".prawduct/artifacts/build-plan.md"
+      version: 1
+      depends_on: ["Product Brief", "Data Model", "Dependency Manifest"]
+      depended_on_by: []
+      last_validated: 2026-02-20
+      tier: 1
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: []
+
+# =============================================================================
+# OPEN QUESTIONS
+# =============================================================================
+
+open_questions: []
+
+# =============================================================================
+# USER EXPERTISE PROFILE
+# =============================================================================
+
+user_expertise:
+  product_thinking: intermediate
+  technical_depth: advanced
+  design_sensibility: basic
+  domain_knowledge: advanced
+  operational_awareness: intermediate
+  evidence:
+    - dimension: technical_depth
+      signal: "Rust 2024 edition, rayon parallelism, Rhai sandbox, WebSocket protocol design"
+      inferred_from: "codebase quality and architectural choices"
+    - dimension: domain_knowledge
+      signal: "Simulation concepts (double buffering, phase ordering, biome adjacency), procedural generation"
+      inferred_from: "domain model sophistication"
+
+# =============================================================================
+# PROCESS STATE
+# =============================================================================
+
+current_stage: iteration
+
+# =============================================================================
+# CHANGE LOG
+# =============================================================================
+
+change_log:
+  - what: "Onboarded existing Worldground codebase into prawduct"
+    why: "Reverse-engineered codebase into prawduct artifacts for governed iteration"
+    blast_radius: meta
+    classification: process
+    date: 2026-02-20
+  - what: "Onboarding reflection"
+    why: "Codebase analysis was accurate — README matched code, all features confirmed implemented, no user corrections needed. 118 tests across 12 files provided strong confidence in coverage assessment. No framework gaps identified."
+    blast_radius: meta
+    classification: process
+    date: 2026-02-20
+
+# =============================================================================
+# BUILD PLAN
+# =============================================================================
+
+build_plan:
+  strategy: feature-first
+  chunks: []
+  current_chunk: null
+  governance_checkpoints: []
+
+# =============================================================================
+# DEV TOOLS
+# =============================================================================
+
+dev_tools:
+  enabled: false
+  strategy: none
+  infrastructure_status: not-started
+
+# =============================================================================
+# BUILD STATE
+# =============================================================================
+
+build_state:
+  source_root: "src/"
+  test_tracking:
+    test_count: 118
+    assertion_count: 0
+    test_files:
+      - "src/simulation/engine.rs"
+      - "src/simulation/mod.rs"
+      - "src/simulation/phase.rs"
+      - "src/simulation/statistics.rs"
+      - "src/server/mod.rs"
+      - "src/server/protocol.rs"
+      - "src/world/tile.rs"
+      - "src/world/generation.rs"
+      - "src/world/topology.rs"
+      - "src/config/generation.rs"
+      - "src/config/simulation.rs"
+      - "src/persistence/snapshot.rs"
+    history: []
+  spec_compliance:
+    requirements: []
+  reviews: []
+
+# =============================================================================
+# REVIEW FINDINGS
+# =============================================================================
+
+review_findings:
+  entries: []
+
+# =============================================================================
+# ITERATION STATE
+# =============================================================================
+
+iteration_state:
+  feedback_cycles: []
+
+# =============================================================================
+# OBSERVATION BACKLOG
+# =============================================================================
+
+observation_backlog:
+  last_triage: null
+  items: []

@@ -1,0 +1,21 @@
+---
+observation_id: 921bbe02-19d5-429e-af71-c008567a0534
+timestamp: 2026-02-20T18:36:52Z
+session_type: product_use
+session_context:
+  product_classification: "simulation-engine"
+  framework_version: 73a388f
+observations:
+  - type: coverage
+    stage: 6
+    severity: note
+    description: "Native Rust acceleration functions registered in Rhai engine eliminate interpreter overhead for hot-path operations (neighbor aggregation, wind alignment, trig). Pattern: when scripted rules iterate over neighbor arrays doing field extraction and math, moving that logic to native functions provides order-of-magnitude speedup without changing the rule authoring interface."
+    evidence: "Added 7 native functions (abs, clamp, wind_align, direction_to, neighbor_avg, neighbor_sum, neighbor_max) to engine.rs. Refactored all 4 weather rules to use them. 126 tests pass."
+    status: acted_on
+    root_cause_analysis:
+      symptom: "Weather rules caused 5x performance regression at 4K tiles due to Rhai interpreter overhead on neighbor iteration loops"
+      root_cause: "Rhai AST interpretation is slow for tight numeric loops over arrays; hot-path operations need native acceleration"
+      category: wrong_abstraction
+skills_affected:
+  - "none — product-specific optimization"
+---
