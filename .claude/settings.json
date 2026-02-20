@@ -4,59 +4,6 @@
     "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then python3 \"$FW/tools/prawduct-statusline.py\" 2>/dev/null || cat > /dev/null; else cat > /dev/null; fi"
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" commit; fi"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" gate; fi"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" stop; fi"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" prompt; fi"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" track; fi"
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "matcher": "clear|startup",
@@ -73,6 +20,59 @@
           {
             "type": "command",
             "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" compact-reinject; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" track; fi"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" prompt; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" commit; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|Read|Task|Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" gate; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FW=$(cat \"$CLAUDE_PROJECT_DIR/.prawduct/framework-path\" 2>/dev/null) || { if [ -f \"$HOME/.prawduct/framework/skills/orchestrator/SKILL.md\" ]; then FW=\"$HOME/.prawduct/framework\"; else FW=\"\"; fi; }; if [ -n \"$FW\" ]; then \"$FW/tools/governance-hook\" stop; fi"
           }
         ]
       }

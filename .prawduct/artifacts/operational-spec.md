@@ -1,5 +1,5 @@
 # Operational Spec — Worldground
-<!-- Artifact: Operational Spec | Version: 1 | Tier: 2 -->
+<!-- Artifact: Operational Spec | Version: 2 | Tier: 2 -->
 <!-- Inferred from codebase analysis — verify with product owner -->
 
 ## Deployment
@@ -15,11 +15,11 @@ cargo build --release  # Recommended for worlds over 1K tiles
 # Generate a world
 cargo run --release -- generate [--worldgen worldgen.toml] [--output snapshots]
 
-# Start simulation server
-cargo run --release -- run [--world PATH] [--tick-rate HZ] [--port PORT]
+# Start simulation server with a fresh world (default)
+cargo run --release -- run [--tick-rate HZ] [--port PORT] [--log-level LEVEL]
 
-# Serve viewer (separate terminal)
-cd viewer && python3 -m http.server 8081
+# Load a specific snapshot
+cargo run --release -- run --world snapshots/world-tick1400-1771617715.bin
 ```
 
 ## Configuration Files
@@ -52,4 +52,4 @@ cd viewer && python3 -m http.server 8081
 - **CPU:** Benefits from multiple cores (rayon parallelism)
 - **Memory:** ~50MB peak for 10K tiles
 - **Disk:** Snapshots are compact bincode (~few MB per 16K-tile world)
-- **Network:** Localhost only (WebSocket + HTTP health)
+- **Network:** Localhost only (WebSocket + HTTP health + embedded viewer, all on same port)

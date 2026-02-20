@@ -11,7 +11,7 @@
 | snapshot_interval | u32 | 100 | Ticks between auto-saves |
 | max_snapshots | u32 | 10 | Maximum snapshots retained |
 | snapshot_directory | String | "./snapshots" | Snapshot storage path |
-| websocket_port | u16 | 8080 | WebSocket server port |
+| websocket_port | u16 | 8118 | WebSocket server port |
 | websocket_bind | String | "127.0.0.1" | Server bind address |
 | rule_directory | String | "./rules" | Path to Rhai rule scripts |
 | log_level | String | "info" | Logging verbosity |
@@ -34,6 +34,8 @@
 ## CLI Overrides
 
 The `run` subcommand accepts overrides for simulation config:
+- `--world PATH` → load a specific snapshot file instead of generating fresh
+- `--worldgen FILE` → use alternate generation config (default: worldgen.toml)
 - `--tick-rate HZ` → overrides `tick_rate_hz`
 - `--port PORT` → overrides `websocket_port`
 - `--log-level LEVEL` → overrides `log_level`

@@ -4,7 +4,7 @@
 <!-- sourced: src/server/protocol.rs, src/server/mod.rs, 2026-02-20 -->
 
 ## Connection
-- **URL:** `ws://127.0.0.1:8080` (port configurable)
+- **URL:** `ws://127.0.0.1:8118` (port configurable)
 - **Protocol:** Standard WebSocket (no subprotocol)
 - **Authentication:** None (local-only)
 

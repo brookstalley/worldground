@@ -35,7 +35,7 @@ The scripting engine enforces strict limits:
 - No untrusted snapshot sources in normal operation
 
 ## Network Exposure
-- WebSocket server on configurable port (default 8080), localhost only
+- WebSocket server on configurable port (default 8118), localhost only
 - HTTP health endpoint on same port, localhost only
 - No outbound network connections
 
