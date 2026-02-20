@@ -480,6 +480,12 @@ fn initialize_weather(tiles: &mut [Tile], rng: &mut impl Rng) {
         tile.weather.wind_direction = rng.gen_range(0.0..360.0);
         tile.weather.cloud_cover =
             (tile.climate.base_precipitation * 0.8 + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0);
+        tile.weather.humidity = match tile.geology.terrain_type {
+            TerrainType::Ocean => (0.7_f32 + rng.gen_range(0.0_f32..0.2_f32)).clamp(0.0, 1.0),
+            TerrainType::Coast => (0.5_f32 + rng.gen_range(0.0_f32..0.2_f32)).clamp(0.0, 1.0),
+            TerrainType::Wetlands => (0.6_f32 + rng.gen_range(-0.1_f32..0.1_f32)).clamp(0.0, 1.0),
+            _ => (tile.climate.base_precipitation * 0.6 + rng.gen_range(-0.1..0.1)).clamp(0.0, 1.0),
+        };
         tile.weather.storm_intensity = 0.0;
     }
 }

@@ -138,6 +138,7 @@ pub struct WeatherLayer {
     pub wind_speed: f32,
     pub wind_direction: f32,
     pub cloud_cover: f32,
+    pub humidity: f32,
     pub storm_intensity: f32,
 }
 
@@ -205,6 +206,7 @@ impl Tile {
                 wind_speed: 0.0,
                 wind_direction: 0.0,
                 cloud_cover: 0.3,
+                humidity: 0.3,
                 storm_intensity: 0.0,
             },
             conditions: ConditionsLayer {

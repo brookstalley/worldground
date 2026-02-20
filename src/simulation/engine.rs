@@ -1,4 +1,4 @@
-use rhai::{Dynamic, Engine, Map, Scope, AST};
+use rhai::{Array, Dynamic, Engine, Map, Scope, AST};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
@@ -120,6 +120,85 @@ impl RuleEngine {
                 (next as f64) / (u64::MAX as f64)
             })
         });
+        // Math helpers for directional wind calculations
+        engine.register_fn("sin_deg", |deg: f64| -> f64 {
+            (deg * std::f64::consts::PI / 180.0).sin()
+        });
+        engine.register_fn("cos_deg", |deg: f64| -> f64 {
+            (deg * std::f64::consts::PI / 180.0).cos()
+        });
+        engine.register_fn("sqrt", |x: f64| -> f64 { x.sqrt() });
+        engine.register_fn("abs", |v: f64| -> f64 { v.abs() });
+        engine.register_fn("clamp", |v: f64, min: f64, max: f64| -> f64 { v.clamp(min, max) });
+
+        // Native acceleration: compute wind-direction alignment between two points.
+        // Returns dot product of the wind vector with the normalized direction from→to.
+        engine.register_fn(
+            "wind_align",
+            |from_x: f64, from_y: f64, to_x: f64, to_y: f64, wind_dir: f64| -> f64 {
+                let dx = to_x - from_x;
+                let dy = to_y - from_y;
+                let dist_sq = dx * dx + dy * dy;
+                if dist_sq < 1e-6 {
+                    return 0.0;
+                }
+                let dist = dist_sq.sqrt();
+                let rad = wind_dir * std::f64::consts::PI / 180.0;
+                (rad.sin() * dx + rad.cos() * dy) / dist
+            },
+        );
+
+        // Native acceleration: normalized direction vector between two points.
+        // Returns [nx, ny] or [0, 0] if coincident.
+        engine.register_fn(
+            "direction_to",
+            |from_x: f64, from_y: f64, to_x: f64, to_y: f64| -> Array {
+                let dx = to_x - from_x;
+                let dy = to_y - from_y;
+                let dist_sq = dx * dx + dy * dy;
+                if dist_sq < 1e-6 {
+                    return vec![Dynamic::from(0.0_f64), Dynamic::from(0.0_f64)];
+                }
+                let dist = dist_sq.sqrt();
+                vec![Dynamic::from(dx / dist), Dynamic::from(dy / dist)]
+            },
+        );
+
+        // Native acceleration: average a nested field across neighbor maps.
+        // Path format: "layer.field" e.g. "weather.temperature"
+        engine.register_fn("neighbor_avg", |neighbors: Array, path: &str| -> f64 {
+            let mut sum = 0.0;
+            let mut count = 0usize;
+            for n in &neighbors {
+                if let Some(v) = get_nested_f64(n, path) {
+                    sum += v;
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                sum / count as f64
+            } else {
+                0.0
+            }
+        });
+
+        // Native acceleration: sum a nested field across neighbor maps.
+        engine.register_fn("neighbor_sum", |neighbors: Array, path: &str| -> f64 {
+            neighbors
+                .iter()
+                .filter_map(|n| get_nested_f64(n, path))
+                .sum()
+        });
+
+        // Native acceleration: max of a nested field across neighbor maps.
+        engine.register_fn("neighbor_max", |neighbors: Array, path: &str| -> f64 {
+            neighbors
+                .iter()
+                .filter_map(|n| get_nested_f64(n, path))
+                .reduce(f64::max)
+                .unwrap_or(0.0)
+        });
+
         engine.register_fn("rand_range", |min: f64, max: f64| -> f64 {
             RNG_STATE.with(|r| {
                 let state = r.get();
@@ -380,11 +459,27 @@ fn xorshift64(mut state: u64) -> u64 {
     state
 }
 
+/// Extract a nested float from a Rhai Dynamic map via "layer.field" dot path.
+fn get_nested_f64(dyn_val: &Dynamic, path: &str) -> Option<f64> {
+    let (layer, field) = path.split_once('.')?;
+    let map_lock = dyn_val.read_lock::<Map>()?;
+    let layer_val = map_lock.get(layer)?;
+    let layer_map_lock = layer_val.read_lock::<Map>()?;
+    let field_val = layer_map_lock.get(field)?;
+    field_val.as_float().ok()
+}
+
 /// Convert a Tile to a Rhai Map for script access.
 pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     let mut map = Map::new();
 
     map.insert("id".into(), Dynamic::from(tile.id as i64));
+
+    // Position
+    let mut pos = Map::new();
+    pos.insert("x".into(), Dynamic::from(tile.position.x as f64));
+    pos.insert("y".into(), Dynamic::from(tile.position.y as f64));
+    map.insert("position".into(), Dynamic::from(pos));
 
     // Geology layer
     let mut geo = Map::new();
@@ -470,6 +565,10 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     weather.insert(
         "cloud_cover".into(),
         Dynamic::from(tile.weather.cloud_cover as f64),
+    );
+    weather.insert(
+        "humidity".into(),
+        Dynamic::from(tile.weather.humidity as f64),
     );
     weather.insert(
         "storm_intensity".into(),
@@ -596,6 +695,12 @@ fn apply_weather_mutation(tile: &mut Tile, field: &str, value: &Dynamic) -> bool
         "storm_intensity" => {
             if let Some(v) = value.as_float().ok() {
                 tile.weather.storm_intensity = (v as f32).clamp(0.0, 1.0);
+                return true;
+            }
+        }
+        "humidity" => {
+            if let Some(v) = value.as_float().ok() {
+                tile.weather.humidity = (v as f32).clamp(0.0, 1.0);
                 return true;
             }
         }

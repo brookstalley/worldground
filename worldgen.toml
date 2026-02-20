@@ -4,7 +4,7 @@
 seed = 0
 
 # Target number of hex tiles (minimum 100)
-tile_count = 1000
+tile_count = 4000
 
 # Fraction of world that is ocean (0.0 - 1.0)
 ocean_ratio = 0.6

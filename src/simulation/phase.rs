@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use tracing::warn;
 
 use crate::simulation::engine::{
@@ -7,10 +8,11 @@ use crate::world::tile::BiomeType;
 use crate::world::World;
 use rhai::Dynamic;
 
-/// Execute a single phase across all tiles using double buffering.
+/// Execute a single phase across all tiles using double buffering and parallel evaluation.
 ///
 /// Reads from a snapshot of current tile state (so all tiles in this phase
-/// see the same input), writes mutations to the live tiles.
+/// see the same input), evaluates tiles in parallel via rayon, then writes
+/// mutations to the live tiles sequentially.
 /// Pre-converts all tiles to Rhai maps once per phase to avoid redundant conversions.
 pub fn execute_phase(
     world: &mut World,
@@ -28,31 +30,45 @@ pub fn execute_phase(
     // Pre-convert all tiles to Rhai maps once (avoids re-converting neighbors repeatedly)
     let tile_maps: Vec<Dynamic> = input_tiles.iter().map(|t| tile_to_rhai_map(t)).collect();
 
+    // Capture values needed by the parallel closure (avoids borrowing `world` across par_iter)
+    let tick_count = world.tick_count;
+    let season = world.season;
+
+    // Parallel evaluation: each tile is independently evaluated by a rayon worker thread.
+    // Thread-local MUTATIONS and RNG_STATE in engine.rs are per-worker, so this is safe.
+    let results: Vec<(usize, Result<TileMutations, RuleError>)> = (0..input_tiles.len())
+        .into_par_iter()
+        .map(|i| {
+            let tile = &input_tiles[i];
+
+            // Gather pre-converted neighbor maps
+            let neighbor_maps: Vec<Dynamic> = tile
+                .neighbors
+                .iter()
+                .filter_map(|&nid| tile_maps.get(nid as usize).cloned())
+                .collect();
+
+            let rng_seed = compute_rng_seed(tick_count, tile.id, phase);
+
+            let result = engine.evaluate_tile_preconverted(
+                phase,
+                &tile_maps[i],
+                neighbor_maps,
+                &season,
+                tick_count,
+                rng_seed,
+                tile.id,
+            );
+
+            (i, result)
+        })
+        .collect();
+
+    // Sequential: apply mutations to live tiles
     let mut errors = Vec::new();
-
-    for i in 0..world.tiles.len() {
-        let tile = &input_tiles[i];
-
-        // Gather pre-converted neighbor maps
-        let neighbor_maps: Vec<Dynamic> = tile
-            .neighbors
-            .iter()
-            .filter_map(|&nid| tile_maps.get(nid as usize).cloned())
-            .collect();
-
-        let rng_seed = compute_rng_seed(world.tick_count, tile.id, phase);
-
-        match engine.evaluate_tile_preconverted(
-            phase,
-            &tile_maps[i],
-            neighbor_maps,
-            &world.season,
-            world.tick_count,
-            rng_seed,
-            tile.id,
-        ) {
+    for (i, result) in results {
+        match result {
             Ok(mutations) => {
-                // Validate biome transitions in terrain phase
                 let mutations = if phase == Phase::Terrain {
                     filter_invalid_biome_transitions(&input_tiles[i], mutations)
                 } else {

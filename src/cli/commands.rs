@@ -8,6 +8,7 @@ use crate::persistence;
 use crate::server::{self, ServerState};
 use crate::simulation;
 use crate::simulation::engine::RuleEngine;
+use crate::world::tile::{WeatherLayer, ConditionsLayer, BiomeLayer, ResourceLayer};
 use crate::world::World;
 
 /// Run the simulation: load world, start WebSocket server, run tick loop.
@@ -77,21 +78,31 @@ pub async fn run_simulation(
     loop {
         let tick_start = std::time::Instant::now();
 
-        // Snapshot tiles before tick for diff computation
-        let before_tiles = world.tiles.clone();
+        // Lightweight snapshot: only capture mutable layers for diff computation
+        let before_layers: Vec<(WeatherLayer, ConditionsLayer, BiomeLayer, ResourceLayer)> =
+            world.tiles.iter().map(|t| {
+                (t.weather.clone(), t.conditions.clone(), t.biome.clone(), t.resources.clone())
+            }).collect();
 
         // Execute tick
         let result = simulation::execute_tick(&mut world, &engine, config.season_length);
 
-        // Build diff and snapshot JSON
-        let diff_json = server::build_diff_json(
-            &before_tiles,
+        // Build diff from lightweight layer snapshots (avoids full tile clone)
+        let diff_json = server::build_diff_json_from_layers(
+            &before_layers,
             &world.tiles,
             world.tick_count,
             world.season,
             &result.statistics,
         );
-        let new_snapshot_json = server::build_snapshot_json(&world);
+
+        // Rebuild full snapshot JSON periodically (every 10 ticks) instead of every tick.
+        // This avoids serializing all tiles to JSON on every tick at large tile counts.
+        let new_snapshot_json = if world.tick_count % 10 == 0 {
+            Some(server::build_snapshot_json(&world))
+        } else {
+            None
+        };
 
         // Update server state (broadcasts diff to clients)
         state
@@ -161,14 +172,14 @@ pub async fn run_simulation(
                 }
             }
         } else {
-            // Check for shutdown without sleeping
+            // Tick took longer than target — yield to tokio runtime and check for shutdown
             tokio::select! {
                 biased;
                 _ = &mut shutdown => {
                     info!("Shutdown signal received");
                     break;
                 }
-                else => {}
+                _ = tokio::task::yield_now() => {}
             }
         }
     }

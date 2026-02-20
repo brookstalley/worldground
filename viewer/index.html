@@ -160,6 +160,12 @@ canvas {
         <option value="moisture">Soil Moisture</option>
         <option value="vegetation">Vegetation Health</option>
         <option value="terrain">Terrain Type</option>
+        <option value="clouds">Cloud Cover</option>
+        <option value="precipitation">Precipitation</option>
+        <option value="humidity">Humidity</option>
+        <option value="wind">Wind Speed</option>
+        <option value="storms">Storm Intensity</option>
+        <option value="weather">Weather (Combined)</option>
       </select>
     </div>
 
@@ -176,26 +182,26 @@ canvas {
 // ============================================================
 const BIOME_COLORS = {
   Ocean: '#1a5276',
-  Desert: '#f0d68a',
-  Grassland: '#7daf4b',
-  Forest: '#2d6a30',
-  Rainforest: '#145a32',
-  Tundra: '#b8c6d0',
-  Taiga: '#4a6741',
-  Savanna: '#c4a747',
-  Wetland: '#5a7a5a',
-  Mountain: '#8b8b8b',
   Ice: '#dce6f0',
+  Tundra: '#b8c6d0',
+  BorealForest: '#4a6741',
+  TemperateForest: '#2d6a30',
+  Grassland: '#7daf4b',
+  Savanna: '#c4a747',
+  Desert: '#f0d68a',
+  TropicalForest: '#145a32',
+  Wetland: '#5a7a5a',
+  Barren: '#8b8b8b',
 };
 
 const TERRAIN_COLORS = {
-  DeepOcean: '#0d3559',
-  ShallowOcean: '#1a6e9e',
-  Coastal: '#5da0c2',
-  Lowland: '#6db36d',
-  Highland: '#a8a060',
-  Mountain: '#8b8b8b',
-  Peak: '#c8c8c8',
+  Ocean: '#0d3559',
+  Coast: '#5da0c2',
+  Plains: '#6db36d',
+  Hills: '#a8a060',
+  Mountains: '#8b8b8b',
+  Cliffs: '#7a6b5d',
+  Wetlands: '#4a7a6a',
 };
 
 // ============================================================
@@ -311,6 +317,43 @@ function getTileColor(tile) {
       const vv = Math.max(0, Math.min(1, vh));
       return `hsl(${60 + vv * 60}, ${30 + vv * 50}%, ${20 + vv * 40}%)`;
     }
+    case 'clouds': {
+      const cc = tile.weather?.cloud_cover ?? 0;
+      const v = Math.max(0, Math.min(1, cc));
+      // Dark blue (clear) -> white (overcast)
+      const l = 15 + v * 70;
+      const s = 60 - v * 40;
+      return `hsl(220, ${s}%, ${l}%)`;
+    }
+    case 'precipitation': {
+      const p = tile.weather?.precipitation ?? 0;
+      if (p < 0.01) return '#1a1a2e';
+      const pt = tile.weather?.precipitation_type ?? 'None';
+      const intensity = Math.max(0, Math.min(1, p * 3));
+      if (pt === 'Snow') return `hsl(200, ${20 + intensity * 30}%, ${50 + intensity * 40}%)`;
+      if (pt === 'Sleet') return `hsl(190, ${30 + intensity * 40}%, ${30 + intensity * 40}%)`;
+      return `hsl(210, ${50 + intensity * 30}%, ${20 + intensity * 50}%)`;
+    }
+    case 'humidity': {
+      const h = tile.weather?.humidity ?? 0;
+      const v = Math.max(0, Math.min(1, h));
+      // Brown (dry) -> green -> blue (wet)
+      const hue = 30 + v * 190;
+      return `hsl(${hue}, ${40 + v * 30}%, ${20 + v * 35}%)`;
+    }
+    case 'wind': {
+      const ws = tile.weather?.wind_speed ?? 0;
+      const v = Math.max(0, Math.min(1, ws / 15));
+      // Green (calm) -> yellow -> red (strong)
+      return `hsl(${120 - v * 120}, ${50 + v * 30}%, ${25 + v * 35}%)`;
+    }
+    case 'storms': {
+      const si = tile.weather?.storm_intensity ?? 0;
+      if (si < 0.02) return '#1a1a2e';
+      const v = Math.max(0, Math.min(1, si));
+      // Dark purple -> bright magenta
+      return `hsl(${280 + v * 20}, ${40 + v * 50}%, ${15 + v * 55}%)`;
+    }
     default:
       return '#444';
   }
@@ -319,6 +362,35 @@ function getTileColor(tile) {
 // ============================================================
 // Rendering
 // ============================================================
+function getWeatherOverlay(tile) {
+  const cc = tile.weather?.cloud_cover ?? 0;
+  const si = tile.weather?.storm_intensity ?? 0;
+  const precip = tile.weather?.precipitation ?? 0;
+  const pt = tile.weather?.precipitation_type ?? 'None';
+
+  // Storm overlay (purple tint)
+  if (si > 0.1) {
+    const a = Math.min(0.7, si * 0.8);
+    return `rgba(80, 20, 120, ${a.toFixed(2)})`;
+  }
+
+  // Precipitation overlay
+  if (precip > 0.05) {
+    const a = Math.min(0.5, precip * 1.5);
+    if (pt === 'Snow') return `rgba(220, 230, 245, ${a.toFixed(2)})`;
+    if (pt === 'Sleet') return `rgba(160, 200, 220, ${a.toFixed(2)})`;
+    return `rgba(60, 100, 180, ${a.toFixed(2)})`;
+  }
+
+  // Cloud overlay (white wash)
+  if (cc > 0.3) {
+    const a = Math.min(0.55, (cc - 0.3) * 0.8);
+    return `rgba(200, 210, 225, ${a.toFixed(2)})`;
+  }
+
+  return null;
+}
+
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
@@ -331,6 +403,7 @@ function render() {
   const viewRight = (canvas.width - viewOffsetX) * invZoom + size * 2;
   const viewTop = -viewOffsetY * invZoom - size * 2;
   const viewBottom = (canvas.height - viewOffsetY) * invZoom + size * 2;
+  const isComposite = (colorMode === 'weather');
 
   for (const [id, pos] of Object.entries(tilePositions)) {
     // Frustum culling
@@ -339,9 +412,19 @@ function render() {
     const tile = tiles[id];
     if (!tile) continue;
 
-    const color = getTileColor(tile);
+    const baseColor = isComposite
+      ? (BIOME_COLORS[tile.biome?.biome_type] || '#444')
+      : getTileColor(tile);
     const stroke = (parseInt(id) === selectedTile) ? '#e94560' : '#111';
-    drawHex(pos.sx, pos.sy, size * 0.95, color, stroke);
+    drawHex(pos.sx, pos.sy, size * 0.95, baseColor, stroke);
+
+    // Composite weather overlay
+    if (isComposite) {
+      const overlay = getWeatherOverlay(tile);
+      if (overlay) {
+        drawHex(pos.sx, pos.sy, size * 0.95, overlay, null);
+      }
+    }
 
     if (parseInt(id) === selectedTile) {
       drawHex(pos.sx, pos.sy, size * 0.95, 'transparent', '#e94560');
@@ -442,6 +525,8 @@ function selectTile(id) {
     <div class="stat-row"><span class="label">Precip</span><span class="value">${t.weather?.precipitation?.toFixed(3)} (${t.weather?.precipitation_type})</span></div>
     <div class="stat-row"><span class="label">Wind</span><span class="value">${t.weather?.wind_speed?.toFixed(1)} @ ${t.weather?.wind_direction?.toFixed(0)}&deg;</span></div>
     <div class="stat-row"><span class="label">Clouds</span><span class="value">${t.weather?.cloud_cover?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Humidity</span><span class="value">${t.weather?.humidity?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Storm</span><span class="value">${t.weather?.storm_intensity?.toFixed(3)}</span></div>
     <div class="layer-title">Conditions</div>
     <div class="stat-row"><span class="label">Moisture</span><span class="value">${t.conditions?.soil_moisture?.toFixed(3)}</span></div>
     <div class="stat-row"><span class="label">Snow</span><span class="value">${t.conditions?.snow_depth?.toFixed(3)}</span></div>
@@ -487,7 +572,7 @@ function updateStats(s) {
 // ============================================================
 function connect() {
   const host = location.hostname || 'localhost';
-  const port = new URLSearchParams(location.search).get('port') || '9090';
+  const port = new URLSearchParams(location.search).get('port') || '8080';
   const url = `ws://${host}:${port}`;
 
   setStatus('connecting');

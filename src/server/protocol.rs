@@ -309,6 +309,7 @@ mod tests {
                     wind_speed: 10.0,
                     wind_direction: 180.0,
                     cloud_cover: 0.9,
+                    humidity: 0.7,
                     storm_intensity: 0.3,
                 }),
                 conditions: None,

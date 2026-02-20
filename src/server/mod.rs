@@ -72,7 +72,7 @@ impl ServerState {
     /// Called by the simulation loop with the new snapshot, diff, and statistics.
     pub async fn on_tick(
         &self,
-        new_snapshot_json: String,
+        new_snapshot_json: Option<String>,
         diff_json: String,
         stats: &TickStatistics,
         tick: u64,
@@ -80,8 +80,10 @@ impl ServerState {
         tile_count: u32,
         last_snapshot_tick: u64,
     ) {
-        // Update snapshot for new connections
-        *self.snapshot_json.write().await = new_snapshot_json;
+        // Update snapshot for new connections (only when a full rebuild is provided)
+        if let Some(json) = new_snapshot_json {
+            *self.snapshot_json.write().await = json;
+        }
 
         // Broadcast diff to all connected clients
         // Ignore send error (no receivers is fine)
@@ -120,6 +122,43 @@ pub fn build_diff_json(
         statistics: TickStatSummary::from_statistics(stats),
     };
     serde_json::to_string(&diff).unwrap_or_else(|_| "{}".to_string())
+}
+
+/// Build the JSON diff from lightweight layer snapshots (avoids full tile clone).
+pub fn build_diff_json_from_layers(
+    before_layers: &[(crate::world::tile::WeatherLayer, crate::world::tile::ConditionsLayer, crate::world::tile::BiomeLayer, crate::world::tile::ResourceLayer)],
+    after_tiles: &[Tile],
+    tick: u64,
+    season: Season,
+    stats: &TickStatistics,
+) -> String {
+    let mut changed_tiles = Vec::new();
+    for (i, tile) in after_tiles.iter().enumerate() {
+        if let Some((bw, bc, bb, br)) = before_layers.get(i) {
+            let weather_changed = *bw != tile.weather;
+            let conditions_changed = *bc != tile.conditions;
+            let biome_changed = *bb != tile.biome;
+            let resources_changed = *br != tile.resources;
+
+            if weather_changed || conditions_changed || biome_changed || resources_changed {
+                changed_tiles.push(protocol::TileChange {
+                    id: tile.id,
+                    weather: if weather_changed { Some(tile.weather.clone()) } else { None },
+                    conditions: if conditions_changed { Some(tile.conditions.clone()) } else { None },
+                    biome: if biome_changed { Some(tile.biome.clone()) } else { None },
+                    resources: if resources_changed { Some(tile.resources.clone()) } else { None },
+                });
+            }
+        }
+    }
+    let diff = protocol::TickDiff {
+        message_type: "TickDiff",
+        tick,
+        season,
+        changed_tiles,
+        statistics: protocol::TickStatSummary::from_statistics(stats),
+    };
+    serde_json::to_string(&diff).unwrap_or_else(|_ | "{}".to_string())
 }
 
 /// Build the JSON snapshot message for a world.
@@ -344,7 +383,7 @@ mod tests {
 
         state
             .on_tick(
-                "new_snapshot".to_string(),
+                Some("new_snapshot".to_string()),
                 "diff".to_string(),
                 &stats,
                 5,
@@ -371,7 +410,7 @@ mod tests {
         let stats = make_test_stats(1);
         state
             .on_tick(
-                "updated".to_string(),
+                Some("updated".to_string()),
                 "diff".to_string(),
                 &stats,
                 1,
@@ -394,7 +433,7 @@ mod tests {
             stats.tick_duration_ms = 200.0;
             state
                 .on_tick(
-                    "{}".to_string(),
+                    Some("{}".to_string()),
                     "{}".to_string(),
                     &stats,
                     i,
@@ -417,7 +456,7 @@ mod tests {
             let stats = make_test_stats(i);
             state
                 .on_tick(
-                    "{}".to_string(),
+                    Some("{}".to_string()),
                     "{}".to_string(),
                     &stats,
                     i,
@@ -440,7 +479,7 @@ mod tests {
         let stats = make_test_stats(1);
         state
             .on_tick(
-                "{}".to_string(),
+                Some("{}".to_string()),
                 "test_diff".to_string(),
                 &stats,
                 1,
@@ -494,7 +533,7 @@ mod tests {
         let stats = make_test_stats(1);
         state
             .on_tick(
-                "{}".to_string(),
+                Some("{}".to_string()),
                 r#"{"message_type":"TickDiff","tick":1}"#.to_string(),
                 &stats,
                 1,
@@ -530,7 +569,7 @@ mod tests {
         let stats = make_test_stats(42);
         state
             .on_tick(
-                "{}".to_string(),
+                Some("{}".to_string()),
                 "{}".to_string(),
                 &stats,
                 42,
