@@ -1,11 +1,18 @@
-// Storm formation, directional propagation, and decay
+// Storm formation, pressure-driven dynamics, and decay
 //
 // Key features:
-// - Directional propagation: storms travel WITH the wind, not isotropically
-// - Gradual nucleation: storms build over many ticks, not instant formation
+// - Pressure-driven nucleation: low pressure systems spawn and sustain storms
+// - Gradual intensification with humidity fuel and pressure support
 // - Slow decay: storms last 30-80 ticks for visible lifecycle
 // - Coastal convergence: land-sea boundary creates uplift storms
 // - Coriolis-correct cyclonic rotation
+// - High pressure suppresses storms (faster decay)
+//
+// NOTE: This Rhai script reads from the pre-phase tile snapshot. The native
+// evaluator (native_weather.rs) chains rule outputs via WeatherAccum, so it
+// reads Rule 1's wind, Rule 2/3's humidity, and Rule 3's cloud_cover instead
+// of the stale snapshot values here. This means storm nucleation uses
+// current-tick clouds, and storm wind amplification builds on computed wind.
 
 let terrain = tile.geology.terrain_type;
 let current_storm = tile.weather.storm_intensity;
@@ -13,8 +20,7 @@ let humidity = tile.weather.humidity;
 let temp = tile.weather.temperature;
 let cloud = tile.weather.cloud_cover;
 let wind_speed = tile.weather.wind_speed;
-let my_x = tile.position.x;
-let my_y = tile.position.y;
+let pressure = tile.weather.pressure;
 
 // === GATHER NEIGHBOR DATA ===
 let max_temp_diff = 0.0;
@@ -30,16 +36,28 @@ let neighbor_storm_avg = if neighbor_count > 0 {
 
 let new_storm = current_storm;
 
-// === FORMATION ===
-// Storms nucleate gradually, then intensify. Lower thresholds create
-// more frequent mild storms; the intensification phase makes strong ones rare.
+// === PRESSURE-DRIVEN NUCLEATION ===
+// Low pressure creates uplift and convergence — the primary storm driver.
+let pressure_deficit = 1013.25 - pressure;
+
+// Strong low pressure + humidity + clouds -> storm nucleation
+if pressure_deficit > 3.0 && humidity > 0.4 && cloud > 0.35 {
+    let pressure_factor = (pressure_deficit - 3.0) * 0.015;
+    if pressure_factor > 0.4 { pressure_factor = 0.4; }
+    let nucleation = pressure_factor * humidity * cloud;
+    if nucleation > new_storm {
+        new_storm = new_storm + (nucleation - new_storm) * 0.3 + rand_range(0.0, 0.03);
+    }
+}
+
+// === FORMATION (secondary mechanisms) ===
 
 // 1. Frontal storms: temperature gradient indicates a front
 if max_temp_diff > 5.0 && humidity > 0.45 && cloud > 0.4 {
     let frontal = (max_temp_diff - 5.0) * 0.02 * humidity * cloud;
     if frontal > 0.3 { frontal = 0.3; }
     if frontal > new_storm {
-        new_storm = new_storm + (frontal - new_storm) * 0.3 + rand_range(0.0, 0.03);
+        new_storm = new_storm + (frontal - new_storm) * 0.25 + rand_range(0.0, 0.03);
     }
 }
 
@@ -68,41 +86,28 @@ if terrain == "Coast" && humidity > 0.50 && cloud > 0.45 {
     }
 }
 
-// === DIRECTIONAL PROPAGATION ===
-// Storms propagate DOWNWIND: a neighbor's storm reaches us if
-// its wind blows FROM the neighbor TOWARD us.
-let directional_storm = 0.0;
-
-for n in neighbors {
-    let n_storm = n.weather.storm_intensity;
-
-    if n_storm > 0.15 {
-        let alignment = wind_align(n.position.x, n.position.y, my_x, my_y, n.weather.wind_direction);
-        if alignment > 0.1 {
-            let n_speed = clamp(n.weather.wind_speed, 0.0, 15.0);
-            let propagated = n_storm * alignment * (0.12 + n_speed * 0.008);
-            if propagated > directional_storm { directional_storm = propagated; }
-        }
+// === NEIGHBOR SPREADING ===
+// Storms spread to adjacent tiles via proximity (replaces broken wind_align propagation)
+if neighbor_storm_avg > 0.15 {
+    let spread = neighbor_storm_avg * 0.08;
+    if spread > 0.02 {
+        new_storm = new_storm + spread;
     }
-}
-
-// Apply directional propagation
-if directional_storm > 0.06 && directional_storm > new_storm * 0.5 {
-    new_storm = new_storm * 0.4 + directional_storm * 0.6;
 }
 
 // Gentle ambient effect from nearby storms (turbulent spreading)
 if neighbor_storm_avg > 0.1 {
-    new_storm = new_storm + neighbor_storm_avg * 0.015;
+    new_storm = new_storm + neighbor_storm_avg * 0.01;
 }
 
 // === INTENSIFICATION ===
-// Active storms feed on humidity, with diminishing returns
-// This creates a natural intensity ceiling
+// Active storms feed on humidity and low pressure, with diminishing returns
 if new_storm > 0.1 && humidity > 0.4 {
     let fuel = (humidity - 0.4) * 0.025;
+    // Low pressure amplifies intensification
+    let pressure_boost = if pressure_deficit > 5.0 { 1.0 + pressure_deficit * 0.01 } else { 1.0 };
     let headroom = 1.0 - new_storm;
-    let intensification = fuel * headroom;
+    let intensification = fuel * headroom * pressure_boost;
     new_storm = new_storm + intensification;
 }
 
@@ -119,6 +124,13 @@ let decay_rate = if terrain == "Ocean" {
 } else {
     0.05   // land: moderate decay
 };
+
+// High pressure suppresses storms (faster decay under ridges)
+if pressure_deficit < -3.0 {
+    let high_pressure_decay = (-pressure_deficit - 3.0) * 0.01;
+    if high_pressure_decay > 0.05 { high_pressure_decay = 0.05; }
+    decay_rate = decay_rate + high_pressure_decay;
+}
 
 // Low humidity starvation
 if humidity < 0.3 {

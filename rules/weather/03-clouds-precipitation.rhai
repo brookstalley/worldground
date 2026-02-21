@@ -5,6 +5,12 @@
 // - Neighbor cloud averaging for spatial coherence
 // - Pre-storm cloud darkening from approaching storms
 // - Precipitation with orographic and convective enhancement
+//
+// NOTE: This Rhai script reads from the pre-phase tile snapshot. The native
+// evaluator (native_weather.rs) chains rule outputs via WeatherAccum, so it
+// reads Rule 2's computed humidity instead of the stale snapshot value here.
+// This means the native path produces more physically consistent results
+// (clouds reflect current-tick humidity, precipitation consumes it in-place).
 
 let temp = tile.weather.temperature;
 let humidity = tile.weather.humidity;
