@@ -1,0 +1,21 @@
+---
+observation_id: c401e6f7-e559-41c6-bf85-0ad10f5b02ea
+timestamp: 2026-02-21T22:08:02Z
+session_type: product_use
+session_context:
+  product_classification: "runs_unattended"
+  framework_version: 643932c
+observations:
+  - type: process_friction
+    stage: 6
+    severity: warning
+    description: "Stale bit-identical parity claims survive after intentional native weather divergence: native_eval.rs trait doc (line 7), nonfunctional-requirements.md (lines 27, 53), and test_tracking.test_files missing native_weather.rs. Three Critic checks flagged these as warnings."
+    evidence: "Critic findings: Spec Compliance warning (NFR claims test exists that was removed, native_eval.rs claims bit-identical), Scope Discipline warning (NFR lines 27/53 reference removed test), Coherence warning (3 stale bit-identical references survive)"
+    status: noted
+    root_cause_analysis:
+      symptom: "Documentation and code comments claim bit-identical native-vs-Rhai parity after the behavior was intentionally changed to allow divergence"
+      root_cause: "When a behavioral decision changes (bit-identical parity dropped), artifact updates and code doc comments are not mechanically linked to the decision — they require manual identification and update"
+      category: incomplete_coverage
+skills_affected:
+  - "agents/critic/SKILL.md"
+---

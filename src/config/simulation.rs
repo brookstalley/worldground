@@ -23,6 +23,8 @@ pub struct SimulationConfig {
     pub season_length: u32,
     #[serde(default = "default_rule_timeout_ms")]
     pub rule_timeout_ms: u32,
+    #[serde(default = "default_native_evaluation")]
+    pub native_evaluation: bool,
 }
 
 fn default_tick_rate() -> f32 {
@@ -54,6 +56,9 @@ fn default_season_length() -> u32 {
 }
 fn default_rule_timeout_ms() -> u32 {
     10
+}
+fn default_native_evaluation() -> bool {
+    true
 }
 
 impl SimulationConfig {

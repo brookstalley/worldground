@@ -1,12 +1,14 @@
 pub mod generation;
 pub mod tile;
 pub mod topology;
+pub mod weather_systems;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::config::generation::GenerationParams;
 pub use tile::{Season, Tile, TopologyType};
+pub use weather_systems::MacroWeatherState;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct World {
@@ -21,4 +23,6 @@ pub struct World {
     pub generation_params: GenerationParams,
     pub snapshot_path: Option<String>,
     pub tiles: Vec<Tile>,
+    #[serde(default)]
+    pub macro_weather: MacroWeatherState,
 }

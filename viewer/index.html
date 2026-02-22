@@ -166,7 +166,19 @@ canvas {
         <option value="humidity">Humidity</option>
         <option value="wind">Wind Speed</option>
         <option value="storms">Storm Intensity</option>
-        <option value="weather">Weather (Combined)</option>
+        <option value="pressure">Pressure</option>
+      </select>
+    </div>
+
+    <div id="weather-toggle" style="margin-top:12px; font-size:12px;">
+      <label><input type="checkbox" id="weather-enabled" checked> Weather layer</label>
+    </div>
+
+    <div id="view-mode" style="display:none; margin-top:12px; font-size:12px;">
+      <label>View:</label>
+      <select id="view-select" style="width:100%;padding:4px 8px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;margin-top:4px;">
+        <option value="map" selected>Map</option>
+        <option value="globe">Globe</option>
       </select>
     </div>
 
@@ -210,9 +222,11 @@ const TERRAIN_COLORS = {
 // ============================================================
 let tiles = {};          // id -> tile data
 let tilePositions = {};  // id -> {x, y}
+let tilePolygons = {};   // id -> [[x,y], ...] Voronoi cell vertices (geodesic only)
 let gridWidth = 0;
 let gridHeight = 0;
 let hexSize = 12;        // pixels per hex unit
+let renderHexSize = 12;  // actual rendering size (scales for geodesic)
 
 let viewOffsetX = 0;
 let viewOffsetY = 0;
@@ -226,6 +240,26 @@ let selectedTile = null;
 let colorMode = 'biome';
 let topologyType = 'FlatHex';
 
+// Globe view state
+let viewMode = 'map';          // 'map' or 'globe'
+let globeRotLon = 0;           // degrees, drag left/right
+let globeRotLat = 20;          // degrees, drag up/down, clamped ±89
+let dragStartRotLon = 0;
+let dragStartRotLat = 0;
+let geoScaleValue = 0;         // saved geoScale from handleSnapshot
+let equirectCanvas = null;     // offscreen canvas for texture
+let equirectData = null;       // cached ImageData pixels
+let textureDirty = true;       // re-render flag
+
+// Weather texture state (separate layer for earth-from-space view)
+const WTEX_W = 1024;
+const WTEX_H = 512;
+let weatherCanvas = null;
+let weatherData = null;       // cached ImageData pixels
+let weatherDirty = true;
+let weatherEnabled = true;
+
+let pressureSystems = [];  // [{id, lat, lon, pressure_anomaly, radius, system_type, moisture}]
 let stats = {};
 let ws = null;
 
@@ -268,6 +302,144 @@ function drawHex(cx, cy, size, fillColor, strokeColor) {
   }
 }
 
+// ============================================================
+// Voronoi cells for geodesic tiles
+// ============================================================
+function computeVoronoiCells() {
+  tilePolygons = {};
+  const ids = Object.keys(tilePositions);
+  const n = ids.length;
+  if (n === 0) return;
+
+  // Build arrays for real tiles
+  const xs = new Float64Array(n);
+  const ys = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    xs[i] = tilePositions[ids[i]].sx;
+    ys[i] = tilePositions[ids[i]].sy;
+  }
+
+  // For geodesic: add ghost copies at ±worldWidth so tiles near the
+  // antimeridian (lon ±180°) see their wrapped neighbors correctly.
+  const worldWidth = 360 * geoScaleValue;
+  const isGeodesic = topologyType === 'Geodesic' && worldWidth > 0;
+  let allXs = xs, allYs = ys, totalN = n;
+
+  if (isGeodesic) {
+    const wrapMargin = worldWidth * 0.15;
+    const ghostXs = [];
+    const ghostYs = [];
+    for (let i = 0; i < n; i++) {
+      if (xs[i] < wrapMargin) {
+        ghostXs.push(xs[i] + worldWidth);
+        ghostYs.push(ys[i]);
+      }
+      if (xs[i] > worldWidth - wrapMargin) {
+        ghostXs.push(xs[i] - worldWidth);
+        ghostYs.push(ys[i]);
+      }
+    }
+    totalN = n + ghostXs.length;
+    allXs = new Float64Array(totalN);
+    allYs = new Float64Array(totalN);
+    allXs.set(xs);
+    allYs.set(ys);
+    for (let i = 0; i < ghostXs.length; i++) {
+      allXs[n + i] = ghostXs[i];
+      allYs[n + i] = ghostYs[i];
+    }
+  }
+
+  const K = Math.min(20, totalN - 1);
+
+  // Only compute cells for real tiles (first n entries)
+  for (let i = 0; i < n; i++) {
+    const px = allXs[i], py = allYs[i];
+
+    // Find K nearest from ALL positions (including ghosts)
+    const dists = new Float64Array(totalN);
+    for (let j = 0; j < totalN; j++) {
+      const dx = px - allXs[j], dy = py - allYs[j];
+      dists[j] = dx * dx + dy * dy;
+    }
+    dists[i] = Infinity; // exclude self
+
+    // Partial sort: find K smallest distances
+    const neighbors = [];
+    const used = new Uint8Array(totalN);
+    for (let k = 0; k < K; k++) {
+      let minD = Infinity, minJ = -1;
+      for (let j = 0; j < totalN; j++) {
+        if (!used[j] && dists[j] < minD) { minD = dists[j]; minJ = j; }
+      }
+      if (minJ < 0) break;
+      used[minJ] = 1;
+      neighbors.push(minJ);
+    }
+
+    // Start with large bounding box
+    const nearestDist = Math.sqrt(dists[neighbors[0]]);
+    const maxR = nearestDist * 4;
+    let poly = [
+      [px - maxR, py - maxR],
+      [px + maxR, py - maxR],
+      [px + maxR, py + maxR],
+      [px - maxR, py + maxR],
+    ];
+
+    // Clip against perpendicular bisector with each neighbor
+    for (const j of neighbors) {
+      const qx = allXs[j], qy = allYs[j];
+      const mx = (px + qx) / 2, my = (py + qy) / 2;
+      const nx = px - qx, ny = py - qy; // normal toward p
+      poly = clipPolygonByLine(poly, mx, my, nx, ny);
+      if (poly.length < 3) break;
+    }
+
+    tilePolygons[ids[i]] = poly;
+  }
+}
+
+// Sutherland-Hodgman: clip polygon to half-plane {x : dot(x - m, n) >= 0}
+function clipPolygonByLine(poly, mx, my, nx, ny) {
+  const out = [];
+  const len = poly.length;
+  if (len < 3) return poly;
+
+  for (let i = 0; i < len; i++) {
+    const cx = poly[i][0], cy = poly[i][1];
+    const ni = (i + 1) % len;
+    const ex = poly[ni][0], ey = poly[ni][1];
+
+    const cDot = (cx - mx) * nx + (cy - my) * ny;
+    const eDot = (ex - mx) * nx + (ey - my) * ny;
+
+    if (cDot >= 0) out.push(poly[i]);
+    if ((cDot >= 0) !== (eDot >= 0)) {
+      const t = cDot / (cDot - eDot);
+      out.push([cx + t * (ex - cx), cy + t * (ey - cy)]);
+    }
+  }
+  return out;
+}
+
+function drawPolygon(poly, fillColor, strokeColor) {
+  if (poly.length < 3) return;
+  ctx.beginPath();
+  ctx.moveTo(poly[0][0], poly[0][1]);
+  for (let i = 1; i < poly.length; i++) {
+    ctx.lineTo(poly[i][0], poly[i][1]);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  if (strokeColor) {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+}
+
 function pixelToTile(px, py) {
   // Convert screen pixel to world coordinates
   const wx = (px - viewOffsetX) / zoom;
@@ -285,8 +457,10 @@ function pixelToTile(px, py) {
       closest = parseInt(id);
     }
   }
-  // Only select if within hex radius
-  if (closestDist < (hexSize * hexSize)) return closest;
+  // For geodesic Voronoi, nearest center is always the correct cell.
+  // For flat hex, require proximity to the hex.
+  if (topologyType === 'Geodesic') return closest;
+  if (closestDist < (renderHexSize * renderHexSize)) return closest;
   return null;
 }
 
@@ -356,6 +530,25 @@ function getTileColor(tile) {
       // Dark purple -> bright magenta
       return `hsl(${280 + v * 20}, ${40 + v * 50}%, ${15 + v * 55}%)`;
     }
+    case 'pressure': {
+      const p = tile.weather?.pressure ?? 1013.25;
+      // Range: 980 hPa (deep low) to 1040 hPa (strong high)
+      const norm = Math.max(0, Math.min(1, (p - 980) / 60));
+      // Blue (low pressure) -> white (standard) -> red (high pressure)
+      if (norm < 0.5) {
+        const t = norm * 2; // 0..1 within low half
+        const r = Math.round(40 + t * 215);
+        const g = Math.round(80 + t * 175);
+        const b = Math.round(220 + t * 35);
+        return `rgb(${r},${g},${b})`;
+      } else {
+        const t = (norm - 0.5) * 2; // 0..1 within high half
+        const r = Math.round(255 - t * 55);
+        const g = Math.round(255 - t * 175);
+        const b = Math.round(255 - t * 195);
+        return `rgb(${r},${g},${b})`;
+      }
+    }
     default:
       return '#444';
   }
@@ -364,75 +557,661 @@ function getTileColor(tile) {
 // ============================================================
 // Rendering
 // ============================================================
-function getWeatherOverlay(tile) {
+// ============================================================
+// Weather RGBA per tile (earth-from-space cloud layer)
+// ============================================================
+function computeWeatherRGBA(tile) {
+  if (!tile) return {r: 0, g: 0, b: 0, a: 0};
+
   const cc = tile.weather?.cloud_cover ?? 0;
   const si = tile.weather?.storm_intensity ?? 0;
   const precip = tile.weather?.precipitation ?? 0;
   const pt = tile.weather?.precipitation_type ?? 'None';
 
-  // Storm overlay (purple tint)
+  if (cc < 0.02 && si < 0.02 && precip < 0.02) return {r: 0, g: 0, b: 0, a: 0};
+
+  // Cloud color progression: thin cirrus → thick cumulus → storm
+  let cr, cg, cb;
   if (si > 0.1) {
-    const a = Math.min(0.7, si * 0.8);
-    return `rgba(80, 20, 120, ${a.toFixed(2)})`;
+    // Storm: dark gray-purple, interpolate with intensity
+    const t = Math.min(1, si);
+    cr = 60 + (1 - t) * 160;
+    cg = 55 + (1 - t) * 165;
+    cb = 70 + (1 - t) * 155;
+  } else if (cc > 0.6) {
+    // Thick cumulus: gray-white
+    cr = 220; cg = 220; cb = 225;
+  } else {
+    // Thin cirrus: bright white
+    cr = 240; cg = 245; cb = 250;
   }
 
-  // Precipitation overlay
-  if (precip > 0.05) {
-    const a = Math.min(0.5, precip * 1.5);
-    if (pt === 'Snow') return `rgba(220, 230, 245, ${a.toFixed(2)})`;
-    if (pt === 'Sleet') return `rgba(160, 200, 220, ${a.toFixed(2)})`;
-    return `rgba(60, 100, 180, ${a.toFixed(2)})`;
+  // Opacity ramp: cc^1.5 makes moderate clouds more visible than cc^2
+  let alpha = Math.pow(cc, 1.5);
+
+  // Storm intensifies opacity
+  if (si > 0.1) {
+    alpha = Math.max(alpha, 0.3 + si * 0.5);
   }
 
-  // Cloud overlay (white wash)
-  if (cc > 0.3) {
-    const a = Math.min(0.55, (cc - 0.3) * 0.8);
-    return `rgba(200, 210, 225, ${a.toFixed(2)})`;
+  // Rain darkening
+  if (precip > 0.05 && pt !== 'Snow') {
+    const darkening = Math.min(0.3, precip * 0.8);
+    cr *= (1 - darkening);
+    cg *= (1 - darkening);
+    cb *= (1 - darkening);
+    alpha = Math.max(alpha, precip * 0.6);
   }
 
-  return null;
+  // Snow brightening
+  if (pt === 'Snow' && precip > 0.05) {
+    cr = Math.min(255, cr + 20);
+    cg = Math.min(255, cg + 20);
+    cb = Math.min(255, cb + 15);
+  }
+
+  alpha = Math.max(0, Math.min(1, alpha));
+
+  return {
+    r: Math.round(cr),
+    g: Math.round(cg),
+    b: Math.round(cb),
+    a: Math.round(alpha * 255)
+  };
+}
+
+// ============================================================
+// Weather texture (offscreen 1024x512 for globe atmosphere layer)
+// ============================================================
+function renderWeatherTexture() {
+  if (!weatherDirty && weatherData) return;
+  if (!geoScaleValue) return;
+
+  if (!weatherCanvas) {
+    weatherCanvas = document.createElement('canvas');
+    weatherCanvas.width = WTEX_W;
+    weatherCanvas.height = WTEX_H;
+  }
+
+  const wctx = weatherCanvas.getContext('2d');
+  wctx.clearRect(0, 0, WTEX_W, WTEX_H);
+
+  const scaleX = WTEX_W / (360 * geoScaleValue);
+  const scaleY = WTEX_H / (180 * geoScaleValue);
+
+  wctx.save();
+  wctx.scale(scaleX, scaleY);
+
+  // Draw per-tile weather
+  for (const [id, pos] of Object.entries(tilePositions)) {
+    const tile = tiles[id];
+    if (!tile) continue;
+    const poly = tilePolygons[id];
+    if (!poly || poly.length < 3) continue;
+
+    const wx = computeWeatherRGBA(tile);
+    if (wx.a === 0) continue;
+
+    wctx.beginPath();
+    wctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) {
+      wctx.lineTo(poly[i][0], poly[i][1]);
+    }
+    wctx.closePath();
+    wctx.fillStyle = `rgba(${wx.r},${wx.g},${wx.b},${(wx.a / 255).toFixed(3)})`;
+    wctx.fill();
+  }
+
+  // Wrapped copies for antimeridian seam
+  const worldWidth = 360 * geoScaleValue;
+  if (worldWidth > 0) {
+    const wrapMargin = worldWidth * 0.15;
+    for (const [id, pos] of Object.entries(tilePositions)) {
+      const tile = tiles[id];
+      if (!tile) continue;
+      const poly = tilePolygons[id];
+      if (!poly || poly.length < 3) continue;
+
+      let shiftX = 0;
+      if (pos.sx < wrapMargin) shiftX = worldWidth;
+      else if (pos.sx > worldWidth - wrapMargin) shiftX = -worldWidth;
+      else continue;
+
+      const wx = computeWeatherRGBA(tile);
+      if (wx.a === 0) continue;
+
+      wctx.beginPath();
+      wctx.moveTo(poly[0][0] + shiftX, poly[0][1]);
+      for (let i = 1; i < poly.length; i++) {
+        wctx.lineTo(poly[i][0] + shiftX, poly[i][1]);
+      }
+      wctx.closePath();
+      wctx.fillStyle = `rgba(${wx.r},${wx.g},${wx.b},${(wx.a / 255).toFixed(3)})`;
+      wctx.fill();
+    }
+  }
+
+  // Pressure system radial gradients baked into weather texture
+  for (const sys of pressureSystems) {
+    const sx = (sys.lon + 180) * geoScaleValue;
+    const sy = (90 - sys.lat) * geoScaleValue;
+    const radiusPx = sys.radius * (180 / Math.PI) * geoScaleValue;
+    const isLow = sys.pressure_anomaly < 0;
+    const strength = Math.min(1, Math.abs(sys.pressure_anomaly) / 30);
+
+    const gradient = wctx.createRadialGradient(sx, sy, 0, sx, sy, radiusPx);
+    if (isLow) {
+      gradient.addColorStop(0, `rgba(60, 100, 220, ${(0.2 * strength).toFixed(3)})`);
+      gradient.addColorStop(1, 'rgba(60, 100, 220, 0)');
+    } else {
+      gradient.addColorStop(0, `rgba(220, 60, 60, ${(0.15 * strength).toFixed(3)})`);
+      gradient.addColorStop(1, 'rgba(220, 60, 60, 0)');
+    }
+
+    wctx.beginPath();
+    wctx.arc(sx, sy, radiusPx, 0, Math.PI * 2);
+    wctx.fillStyle = gradient;
+    wctx.fill();
+  }
+
+  wctx.restore();
+
+  weatherData = wctx.getImageData(0, 0, WTEX_W, WTEX_H);
+  weatherDirty = false;
+}
+
+// ============================================================
+// Equirectangular texture (offscreen, for globe view)
+// ============================================================
+const TEX_W = 2048;
+const TEX_H = 1024;
+
+function renderEquirectTexture() {
+  if (!textureDirty && equirectData) return;
+
+  if (!equirectCanvas) {
+    equirectCanvas = document.createElement('canvas');
+    equirectCanvas.width = TEX_W;
+    equirectCanvas.height = TEX_H;
+  }
+
+  const tctx = equirectCanvas.getContext('2d');
+  tctx.clearRect(0, 0, TEX_W, TEX_H);
+
+  // Draw ocean background
+  tctx.fillStyle = BIOME_COLORS.Ocean;
+  tctx.fillRect(0, 0, TEX_W, TEX_H);
+
+  // Scale so that world coordinates (lon+180)*geoScale, (90-lat)*geoScale
+  // map into the texture. geoScaleValue converts degrees to world px.
+  // World spans: x=[0, 360*geoScale], y=[0, 180*geoScale]
+  const scaleX = TEX_W / (360 * geoScaleValue);
+  const scaleY = TEX_H / (180 * geoScaleValue);
+
+  tctx.save();
+  tctx.scale(scaleX, scaleY);
+
+  for (const [id, pos] of Object.entries(tilePositions)) {
+    const tile = tiles[id];
+    if (!tile) continue;
+    const poly = tilePolygons[id];
+    if (!poly || poly.length < 3) continue;
+
+    tctx.beginPath();
+    tctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) {
+      tctx.lineTo(poly[i][0], poly[i][1]);
+    }
+    tctx.closePath();
+    tctx.fillStyle = getTileColor(tile);
+    tctx.fill();
+  }
+
+  // Wrapped copies for antimeridian seam
+  const worldWidth = 360 * geoScaleValue;
+  if (worldWidth > 0) {
+    const wrapMargin = worldWidth * 0.15;
+    for (const [id, pos] of Object.entries(tilePositions)) {
+      const tile = tiles[id];
+      if (!tile) continue;
+      const poly = tilePolygons[id];
+      if (!poly || poly.length < 3) continue;
+
+      let shiftX = 0;
+      if (pos.sx < wrapMargin) shiftX = worldWidth;
+      else if (pos.sx > worldWidth - wrapMargin) shiftX = -worldWidth;
+      else continue;
+
+      tctx.beginPath();
+      tctx.moveTo(poly[0][0] + shiftX, poly[0][1]);
+      for (let i = 1; i < poly.length; i++) {
+        tctx.lineTo(poly[i][0] + shiftX, poly[i][1]);
+      }
+      tctx.closePath();
+      tctx.fillStyle = getTileColor(tile);
+      tctx.fill();
+    }
+  }
+
+  tctx.restore();
+
+  equirectData = tctx.getImageData(0, 0, TEX_W, TEX_H);
+  textureDirty = false;
+}
+
+// ============================================================
+// Globe renderer (raycasting with texture sampling)
+// ============================================================
+function renderGlobe() {
+  renderEquirectTexture();
+  const useWeather = weatherEnabled && topologyType === 'Geodesic';
+  if (useWeather) renderWeatherTexture();
+
+  const canvasW = canvas.width;
+  const canvasH = canvas.height;
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+  const r = Math.min(canvasW, canvasH) * 0.42 * zoom;
+  const rAtm = useWeather ? r * 1.015 : r;  // atmosphere shell radius
+  const rOuter = rAtm;  // bounding sphere for pixel loop
+
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  // Bounding box covers the larger atmosphere sphere
+  const x0 = Math.max(0, Math.floor(cx - rOuter));
+  const y0 = Math.max(0, Math.floor(cy - rOuter));
+  const x1 = Math.min(canvasW, Math.ceil(cx + rOuter));
+  const y1 = Math.min(canvasH, Math.ceil(cy + rOuter));
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w <= 0 || h <= 0) return;
+
+  const imgData = ctx.createImageData(w, h);
+  const pixels = imgData.data;
+  const texPixels = equirectData.data;
+  const wxPixels = (useWeather && weatherData) ? weatherData.data : null;
+
+  const invR = 1 / r;
+  const invRAtm = 1 / rAtm;
+  const latRad = globeRotLat * Math.PI / 180;
+  const lonRad = globeRotLon * Math.PI / 180;
+  const cosLat = Math.cos(latRad);
+  const sinLat = Math.sin(latRad);
+  const cosLon = Math.cos(lonRad);
+  const sinLon = Math.sin(lonRad);
+
+  // Camera basis vectors (same for both spheres)
+  const rx = -sinLon,          ry = cosLon,           rz = 0;
+  const ux = -sinLat * cosLon, uy = -sinLat * sinLon, uz = cosLat;
+  const fx = cosLat * cosLon,  fy = cosLat * sinLon,  fz = sinLat;
+
+  const invPI = 1 / Math.PI;
+
+  for (let py = y0; py < y1; py++) {
+    const rowOff = (py - y0) * w;
+
+    for (let px = x0; px < x1; px++) {
+      const sx = px - cx;
+      const sy = -(py - cy);
+
+      // Terrain sphere test
+      const nx_t = sx * invR;
+      const ny_t = sy * invR;
+      const distSq_t = nx_t * nx_t + ny_t * ny_t;
+      const terrainHit = distSq_t <= 1;
+
+      // Atmosphere sphere test
+      const nx_a = sx * invRAtm;
+      const ny_a = sy * invRAtm;
+      const distSq_a = nx_a * nx_a + ny_a * ny_a;
+      const atmosHit = wxPixels && distSq_a <= 1;
+
+      if (!terrainHit && !atmosHit) continue;
+
+      const outIdx = (rowOff + (px - x0)) * 4;
+
+      // Sample terrain texture
+      let tr = 0, tg = 0, tb = 0, tShade = 1;
+      if (terrainHit) {
+        const nz = Math.sqrt(1 - distSq_t);
+        const wx = nx_t * rx + ny_t * ux + nz * fx;
+        const wy = nx_t * ry + ny_t * uy + nz * fy;
+        const wz = nx_t * rz + ny_t * uz + nz * fz;
+
+        const lat = Math.asin(Math.max(-1, Math.min(1, wz)));
+        const lon = Math.atan2(wy, wx);
+
+        const texX = Math.max(0, Math.min(TEX_W - 1, ((lon * invPI + 1) * 0.5 * TEX_W) | 0));
+        const texY = Math.max(0, Math.min(TEX_H - 1, ((0.5 - lat * invPI) * TEX_H) | 0));
+        const texIdx = (texY * TEX_W + texX) * 4;
+
+        tShade = 0.55 + 0.45 * nz;
+        tr = texPixels[texIdx]     * tShade;
+        tg = texPixels[texIdx + 1] * tShade;
+        tb = texPixels[texIdx + 2] * tShade;
+      }
+
+      // Sample weather texture
+      let wr = 0, wg = 0, wb = 0, wa = 0;
+      if (atmosHit) {
+        const nz = Math.sqrt(1 - distSq_a);
+        const awx = nx_a * rx + ny_a * ux + nz * fx;
+        const awy = nx_a * ry + ny_a * uy + nz * fy;
+        const awz = nx_a * rz + ny_a * uz + nz * fz;
+
+        const lat = Math.asin(Math.max(-1, Math.min(1, awz)));
+        const lon = Math.atan2(awy, awx);
+
+        const wtx = Math.max(0, Math.min(WTEX_W - 1, ((lon * invPI + 1) * 0.5 * WTEX_W) | 0));
+        const wty = Math.max(0, Math.min(WTEX_H - 1, ((0.5 - lat * invPI) * WTEX_H) | 0));
+        const wxIdx = (wty * WTEX_W + wtx) * 4;
+
+        wr = wxPixels[wxIdx];
+        wg = wxPixels[wxIdx + 1];
+        wb = wxPixels[wxIdx + 2];
+        wa = wxPixels[wxIdx + 3] / 255;
+      }
+
+      // Composite terrain + weather
+      if (terrainHit) {
+        // Cloud shadow darkens terrain
+        const shadow = 1 - wa * 0.4;
+        const sr = tr * shadow;
+        const sg = tg * shadow;
+        const sb = tb * shadow;
+
+        // Alpha blend weather over shadowed terrain
+        pixels[outIdx]     = sr * (1 - wa) + wr * wa;
+        pixels[outIdx + 1] = sg * (1 - wa) + wg * wa;
+        pixels[outIdx + 2] = sb * (1 - wa) + wb * wa;
+        pixels[outIdx + 3] = 255;
+      } else {
+        // Atmosphere-only ring (thin edge between terrain and atmosphere)
+        const edgeA = wa * 0.7;
+        pixels[outIdx]     = wr * edgeA;
+        pixels[outIdx + 1] = wg * edgeA;
+        pixels[outIdx + 2] = wb * edgeA;
+        pixels[outIdx + 3] = Math.round(edgeA * 255);
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, x0, y0);
+
+  // Atmosphere glow ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, rAtm + 2, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(100, 160, 255, 0.3)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, rAtm + 5, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(80, 140, 255, 0.15)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Pressure system H/L markers on globe (drawn on top of raycasted image)
+  for (const sys of pressureSystems) {
+    const tLat = sys.lat * Math.PI / 180;
+    const tLon = sys.lon * Math.PI / 180;
+    const twx = Math.cos(tLat) * Math.cos(tLon);
+    const twy = Math.cos(tLat) * Math.sin(tLon);
+    const twz = Math.sin(tLat);
+
+    const snx = twx * rx + twy * ry + twz * rz;
+    const sny = twx * ux + twy * uy + twz * uz;
+    const snz = twx * fx + twy * fy + twz * fz;
+
+    if (snz > 0.05) {
+      const spx = cx + snx * r;
+      const spy = cy - sny * r;
+      const isLow = sys.pressure_anomaly < 0;
+
+      ctx.fillStyle = isLow ? '#4488ff' : '#ff4444';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(isLow ? 'L' : 'H', spx, spy);
+    }
+  }
+
+  // Selected tile highlight on globe
+  if (selectedTile !== null && tiles[selectedTile]) {
+    const tile = tiles[selectedTile];
+    const tLat = (tile.position?.lat ?? 0) * Math.PI / 180;
+    const tLon = (tile.position?.lon ?? 0) * Math.PI / 180;
+
+    const twx = Math.cos(tLat) * Math.cos(tLon);
+    const twy = Math.cos(tLat) * Math.sin(tLon);
+    const twz = Math.sin(tLat);
+
+    const snx = twx * rx + twy * ry + twz * rz;
+    const sny = twx * ux + twy * uy + twz * uz;
+    const snz = twx * fx + twy * fy + twz * fz;
+
+    if (snz > 0) {
+      const spx = cx + snx * r;
+      const spy = cy - sny * r;
+      ctx.beginPath();
+      ctx.arc(spx, spy, 6, 0, Math.PI * 2);
+      ctx.strokeStyle = '#e94560';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
+// ============================================================
+// Globe click: pixel → tile
+// ============================================================
+function pixelToTileGlobe(px, py) {
+  const canvasW = canvas.width;
+  const canvasH = canvas.height;
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+  const r = Math.min(canvasW, canvasH) * 0.42 * zoom;
+
+  const nx = (px - cx) / r;
+  const ny = -(py - cy) / r;
+  const distSq = nx * nx + ny * ny;
+  if (distSq > 1) return null;
+
+  const nz = Math.sqrt(1 - distSq);
+
+  // Camera basis (same as renderGlobe)
+  const latRad = globeRotLat * Math.PI / 180;
+  const lonRad = globeRotLon * Math.PI / 180;
+  const cosLat = Math.cos(latRad);
+  const sinLat = Math.sin(latRad);
+  const cosLon = Math.cos(lonRad);
+  const sinLon = Math.sin(lonRad);
+
+  const wx = nx * (-sinLon) + ny * (-sinLat * cosLon) + nz * (cosLat * cosLon);
+  const wy = nx * (cosLon)  + ny * (-sinLat * sinLon) + nz * (cosLat * sinLon);
+  const wz =                  ny * (cosLat)            + nz * (sinLat);
+
+  // Find nearest tile using dot product with tile's 3D position
+  let bestId = null;
+  let bestDot = -Infinity;
+  for (const [id, tile] of Object.entries(tiles)) {
+    const p = tile.position;
+    if (p.x == null) continue;
+    const dot = wx * p.x + wy * p.y + wz * p.z;
+    if (dot > bestDot) {
+      bestDot = dot;
+      bestId = parseInt(id);
+    }
+  }
+  return bestId;
 }
 
 function render() {
+  if (viewMode === 'globe') { renderGlobe(); return; }
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.translate(viewOffsetX, viewOffsetY);
   ctx.scale(zoom, zoom);
 
-  const size = hexSize;
+  const size = renderHexSize;
   const invZoom = 1 / zoom;
   const viewLeft = -viewOffsetX * invZoom - size * 2;
   const viewRight = (canvas.width - viewOffsetX) * invZoom + size * 2;
   const viewTop = -viewOffsetY * invZoom - size * 2;
   const viewBottom = (canvas.height - viewOffsetY) * invZoom + size * 2;
-  const isComposite = (colorMode === 'weather');
+  const useVoronoi = topologyType === 'Geodesic';
 
+  // Pass 1: terrain/data layer
   for (const [id, pos] of Object.entries(tilePositions)) {
-    // Frustum culling
     if (pos.sx < viewLeft || pos.sx > viewRight || pos.sy < viewTop || pos.sy > viewBottom) continue;
 
     const tile = tiles[id];
     if (!tile) continue;
 
-    const baseColor = isComposite
-      ? (BIOME_COLORS[tile.biome?.biome_type] || '#444')
-      : getTileColor(tile);
+    const baseColor = getTileColor(tile);
     const stroke = (parseInt(id) === selectedTile) ? '#e94560' : '#111';
-    drawHex(pos.sx, pos.sy, size * 0.95, baseColor, stroke);
+    const poly = useVoronoi ? tilePolygons[id] : null;
 
-    // Composite weather overlay
-    if (isComposite) {
-      const overlay = getWeatherOverlay(tile);
-      if (overlay) {
+    if (poly) {
+      drawPolygon(poly, baseColor, stroke);
+    } else {
+      drawHex(pos.sx, pos.sy, size * 0.95, baseColor, stroke);
+    }
+
+    if (parseInt(id) === selectedTile) {
+      if (poly) {
+        drawPolygon(poly, 'transparent', '#e94560');
+      } else {
+        drawHex(pos.sx, pos.sy, size * 0.95, 'transparent', '#e94560');
+      }
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  // Pass 1b: wrapped copies at antimeridian
+  if (useVoronoi && geoScaleValue > 0) {
+    const worldWidth = 360 * geoScaleValue;
+    const wrapMargin = worldWidth * 0.15;
+    for (const [id, pos] of Object.entries(tilePositions)) {
+      let shiftX = 0;
+      if (pos.sx < wrapMargin) shiftX = worldWidth;
+      else if (pos.sx > worldWidth - wrapMargin) shiftX = -worldWidth;
+      else continue;
+
+      const shiftedX = pos.sx + shiftX;
+      if (shiftedX < viewLeft || shiftedX > viewRight) continue;
+
+      const tile = tiles[id];
+      if (!tile) continue;
+      const poly = tilePolygons[id];
+      if (!poly || poly.length < 3) continue;
+
+      const baseColor = getTileColor(tile);
+      const stroke = (parseInt(id) === selectedTile) ? '#e94560' : '#111';
+
+      const shifted = poly.map(p => [p[0] + shiftX, p[1]]);
+      drawPolygon(shifted, baseColor, stroke);
+    }
+  }
+
+  // Pass 2: weather overlay (clouds, precipitation, storms)
+  if (weatherEnabled) {
+    for (const [id, pos] of Object.entries(tilePositions)) {
+      if (pos.sx < viewLeft || pos.sx > viewRight || pos.sy < viewTop || pos.sy > viewBottom) continue;
+
+      const tile = tiles[id];
+      if (!tile) continue;
+
+      const wx = computeWeatherRGBA(tile);
+      if (wx.a === 0) continue;
+
+      const overlay = `rgba(${wx.r},${wx.g},${wx.b},${(wx.a / 255).toFixed(3)})`;
+      const poly = useVoronoi ? tilePolygons[id] : null;
+
+      if (poly) {
+        drawPolygon(poly, overlay, null);
+      } else {
         drawHex(pos.sx, pos.sy, size * 0.95, overlay, null);
       }
     }
 
-    if (parseInt(id) === selectedTile) {
-      drawHex(pos.sx, pos.sy, size * 0.95, 'transparent', '#e94560');
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    // Weather overlay for wrapped copies
+    if (useVoronoi && geoScaleValue > 0) {
+      const worldWidth = 360 * geoScaleValue;
+      const wrapMargin = worldWidth * 0.15;
+      for (const [id, pos] of Object.entries(tilePositions)) {
+        let shiftX = 0;
+        if (pos.sx < wrapMargin) shiftX = worldWidth;
+        else if (pos.sx > worldWidth - wrapMargin) shiftX = -worldWidth;
+        else continue;
+
+        const shiftedX = pos.sx + shiftX;
+        if (shiftedX < viewLeft || shiftedX > viewRight) continue;
+
+        const tile = tiles[id];
+        if (!tile) continue;
+        const poly = tilePolygons[id];
+        if (!poly || poly.length < 3) continue;
+
+        const wx = computeWeatherRGBA(tile);
+        if (wx.a === 0) continue;
+
+        const shifted = poly.map(p => [p[0] + shiftX, p[1]]);
+        drawPolygon(shifted, `rgba(${wx.r},${wx.g},${wx.b},${(wx.a / 255).toFixed(3)})`, null);
+      }
     }
+  }
+
+  ctx.restore();
+
+  // Draw pressure system overlays on the map
+  drawPressureSystemsMap();
+}
+
+// ============================================================
+// Pressure system overlay (map view)
+// ============================================================
+function drawPressureSystemsMap() {
+  if (pressureSystems.length === 0) return;
+  if (topologyType !== 'Geodesic' || !geoScaleValue) return;
+
+  ctx.save();
+  ctx.translate(viewOffsetX, viewOffsetY);
+  ctx.scale(zoom, zoom);
+
+  for (const sys of pressureSystems) {
+    const sx = (sys.lon + 180) * geoScaleValue;
+    const sy = (90 - sys.lat) * geoScaleValue;
+    const radiusPx = sys.radius * (180 / Math.PI) * geoScaleValue; // radians -> degrees -> pixels
+
+    const isLow = sys.pressure_anomaly < 0;
+    const color = isLow ? 'rgba(60, 100, 220, 0.25)' : 'rgba(220, 60, 60, 0.25)';
+    const borderColor = isLow ? 'rgba(60, 100, 220, 0.6)' : 'rgba(220, 60, 60, 0.6)';
+
+    // Semi-transparent influence circle
+    ctx.beginPath();
+    ctx.arc(sx, sy, radiusPx, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.stroke();
+
+    // Center marker with H/L label
+    ctx.fillStyle = isLow ? '#4488ff' : '#ff4444';
+    ctx.font = `bold ${Math.max(10, 14 / zoom)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isLow ? 'L' : 'H', sx, sy);
+
+    // Pressure value
+    ctx.fillStyle = '#ccc';
+    ctx.font = `${Math.max(8, 10 / zoom)}px sans-serif`;
+    ctx.fillText(`${(1013.25 + sys.pressure_anomaly).toFixed(0)}`, sx, sy + 14 / zoom);
   }
 
   ctx.restore();
@@ -447,13 +1226,23 @@ container.addEventListener('mousedown', (e) => {
   dragStartY = e.clientY;
   dragStartOffsetX = viewOffsetX;
   dragStartOffsetY = viewOffsetY;
+  dragStartRotLon = globeRotLon;
+  dragStartRotLat = globeRotLat;
   container.classList.add('dragging');
 });
 
 window.addEventListener('mousemove', (e) => {
   if (!isDragging) return;
-  viewOffsetX = dragStartOffsetX + (e.clientX - dragStartX);
-  viewOffsetY = dragStartOffsetY + (e.clientY - dragStartY);
+  const dx = e.clientX - dragStartX;
+  const dy = e.clientY - dragStartY;
+
+  if (viewMode === 'globe') {
+    globeRotLon = dragStartRotLon - dx * 0.3;
+    globeRotLat = Math.max(-89, Math.min(89, dragStartRotLat + dy * 0.3));
+  } else {
+    viewOffsetX = dragStartOffsetX + dx;
+    viewOffsetY = dragStartOffsetY + dy;
+  }
   render();
 });
 
@@ -466,30 +1255,55 @@ window.addEventListener('mouseup', (e) => {
   // If barely moved, treat as click
   if (moved < 4) {
     const rect = canvas.getBoundingClientRect();
-    const tileId = pixelToTile(e.clientX - rect.left, e.clientY - rect.top);
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const tileId = (viewMode === 'globe') ? pixelToTileGlobe(px, py) : pixelToTile(px, py);
     selectTile(tileId);
   }
 });
 
 container.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-
-  const oldZoom = zoom;
   const delta = e.deltaY > 0 ? 0.9 : 1.1;
-  zoom = Math.max(0.1, Math.min(10, zoom * delta));
 
-  // Zoom toward cursor
-  viewOffsetX = mx - (mx - viewOffsetX) * (zoom / oldZoom);
-  viewOffsetY = my - (my - viewOffsetY) * (zoom / oldZoom);
+  if (viewMode === 'globe') {
+    // Globe zoom: scale the globe radius via zoom, no pan offset changes
+    zoom = Math.max(0.3, Math.min(5, zoom * delta));
+  } else {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const oldZoom = zoom;
+    zoom = Math.max(0.1, Math.min(10, zoom * delta));
+
+    // Zoom toward cursor
+    viewOffsetX = mx - (mx - viewOffsetX) * (zoom / oldZoom);
+    viewOffsetY = my - (my - viewOffsetY) * (zoom / oldZoom);
+  }
 
   render();
 }, { passive: false });
 
 document.getElementById('color-select').addEventListener('change', (e) => {
   colorMode = e.target.value;
+  textureDirty = true;
+  render();
+});
+
+document.getElementById('weather-enabled').addEventListener('change', (e) => {
+  weatherEnabled = e.target.checked;
+  weatherDirty = true;
+  textureDirty = true;
+  render();
+});
+
+document.getElementById('view-select').addEventListener('change', (e) => {
+  viewMode = e.target.value;
+  if (viewMode === 'globe') {
+    textureDirty = true;
+    zoom = 1; // reset zoom for globe
+  }
   render();
 });
 
@@ -532,7 +1346,9 @@ function selectTile(id) {
     <div class="stat-row"><span class="label">Wind</span><span class="value">${t.weather?.wind_speed?.toFixed(1)} @ ${t.weather?.wind_direction?.toFixed(0)}&deg;</span></div>
     <div class="stat-row"><span class="label">Clouds</span><span class="value">${t.weather?.cloud_cover?.toFixed(3)}</span></div>
     <div class="stat-row"><span class="label">Humidity</span><span class="value">${t.weather?.humidity?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Pressure</span><span class="value">${t.weather?.pressure?.toFixed(1) ?? '1013.3'} hPa</span></div>
     <div class="stat-row"><span class="label">Storm</span><span class="value">${t.weather?.storm_intensity?.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="label">Macro Wind</span><span class="value">${t.weather?.macro_wind_speed?.toFixed(1) ?? '0.0'} @ ${t.weather?.macro_wind_direction?.toFixed(0) ?? '0'}&deg;</span></div>
     <div class="layer-title">Conditions</div>
     <div class="stat-row"><span class="label">Moisture</span><span class="value">${t.conditions?.soil_moisture?.toFixed(3)}</span></div>
     <div class="stat-row"><span class="label">Snow</span><span class="value">${t.conditions?.snow_depth?.toFixed(3)}</span></div>
@@ -626,6 +1442,7 @@ function handleSnapshot(msg) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
   const geoScale = hexSize * 2; // ~24 px/degree for equirectangular projection
+  geoScaleValue = geoScale;
 
   for (const t of msg.tiles) {
     tiles[t.id] = t;
@@ -645,13 +1462,40 @@ function handleSnapshot(msg) {
     maxY = Math.max(maxY, sy);
   }
 
-  // Center view
+  // Compute render hex size and Voronoi cells for geodesic
+  if (topologyType === 'Geodesic') {
+    const tileCount = msg.tiles.length;
+    const angularSpacing = Math.sqrt(4 * Math.PI / tileCount) * (180 / Math.PI); // degrees
+    renderHexSize = angularSpacing * geoScale * 0.55; // pixels, for frustum culling margin
+    computeVoronoiCells();
+  } else {
+    renderHexSize = hexSize;
+    tilePolygons = {};
+  }
+
+  // Show/hide globe toggle based on topology
+  document.getElementById('view-mode').style.display =
+    (topologyType === 'Geodesic') ? 'block' : 'none';
+  if (topologyType !== 'Geodesic' && viewMode === 'globe') {
+    viewMode = 'map';
+    document.getElementById('view-select').value = 'map';
+  }
+
+  // Parse pressure systems
+  pressureSystems = msg.pressure_systems || [];
+
+  textureDirty = true;
+  weatherDirty = true;
+
+  // Center view (for map mode)
   const worldW = maxX - minX;
   const worldH = maxY - minY;
-  zoom = Math.min(canvas.width / (worldW + hexSize * 4), canvas.height / (worldH + hexSize * 4));
-  zoom = Math.max(0.1, Math.min(5, zoom));
-  viewOffsetX = (canvas.width - worldW * zoom) / 2 - minX * zoom;
-  viewOffsetY = (canvas.height - worldH * zoom) / 2 - minY * zoom;
+  if (viewMode !== 'globe') {
+    zoom = Math.min(canvas.width / (worldW + renderHexSize * 4), canvas.height / (worldH + renderHexSize * 4));
+    zoom = Math.max(0.1, Math.min(5, zoom));
+    viewOffsetX = (canvas.width - worldW * zoom) / 2 - minX * zoom;
+    viewOffsetY = (canvas.height - worldH * zoom) / 2 - minY * zoom;
+  }
 
   render();
 }
@@ -669,6 +1513,14 @@ function handleDiff(msg) {
     if (change.biome) t.biome = change.biome;
     if (change.resources) t.resources = change.resources;
   }
+
+  // Update pressure systems from diff
+  if (msg.pressure_systems) {
+    pressureSystems = msg.pressure_systems;
+  }
+
+  textureDirty = true;
+  weatherDirty = true;
 
   if (msg.statistics) {
     updateStats(msg.statistics);

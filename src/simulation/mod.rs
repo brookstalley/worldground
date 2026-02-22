@@ -1040,10 +1040,232 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_world_does_not_desertify() {
+        // Run the native weather evaluator for 1000 ticks on a generated world.
+        // Desert count must not increase by more than 10% of land tiles.
+        let dir = TempDir::new().unwrap();
+        setup_empty_rule_dirs(dir.path());
+
+        // Use the full production rule set (weather, conditions, terrain, resources)
+        // via empty rule dirs — the native evaluator handles weather natively,
+        // and we add minimal conditions/terrain rules for the feedback loop.
+        make_rule_dir(
+            dir.path(),
+            "conditions",
+            &[(
+                "01-moisture.rhai",
+                r#"
+                let precip = tile.weather.precipitation;
+                let drainage = tile.geology.drainage;
+                let current = tile.conditions.soil_moisture;
+                let added = precip * 0.3;
+                let temp = tile.weather.temperature;
+                let snow = tile.conditions.snow_depth;
+                let snowmelt_added = if temp > 275.0 && snow > 0.0 {
+                    snow * 0.1 * 0.8
+                } else { 0.0 };
+                let drained = current * drainage * 0.1;
+                let new_moisture = current + added + snowmelt_added - drained;
+                if new_moisture < 0.0 { set("soil_moisture", 0.0); }
+                else if new_moisture > 1.0 { set("soil_moisture", 1.0); }
+                else { set("soil_moisture", new_moisture); }
+                "#,
+            ),
+            (
+                "02-snow.rhai",
+                r#"
+                let temp = tile.weather.temperature;
+                let precip = tile.weather.precipitation;
+                let precip_type = tile.weather.precipitation_type;
+                let snow = tile.conditions.snow_depth;
+                if precip_type == "Snow" {
+                    set("snow_depth", snow + precip * 0.5);
+                } else if temp > 275.0 && snow > 0.0 {
+                    let melt = snow * 0.1;
+                    let new_snow = snow - melt;
+                    if new_snow < 0.01 { set("snow_depth", 0.0); }
+                    else { set("snow_depth", new_snow); }
+                }
+                "#,
+            )],
+        );
+
+        make_rule_dir(
+            dir.path(),
+            "terrain",
+            &[(
+                "01-pressure.rhai",
+                r#"
+                let p = tile.biome.transition_pressure;
+                if tile.conditions.drought_days > 10 { p = p - 0.02; }
+                if tile.conditions.soil_moisture > 0.5 { p = p + 0.01; }
+                if p > 1.0 { p = 1.0; }
+                if p < -1.0 { p = -1.0; }
+                set("transition_pressure", p);
+                "#,
+            ),
+            (
+                "02-transition.rhai",
+                r#"
+                let biome = tile.biome.biome_type;
+                let pressure = tile.biome.transition_pressure;
+                let stability = tile.biome.ticks_in_current_biome;
+                if biome == "Ocean" { return; }
+                let resist = stability * 0.0006;
+                if resist > 0.3 { resist = 0.3; }
+                let threshold = 0.6 + resist;
+                if pressure < -threshold {
+                    if biome == "Grassland" { set("biome_type", "Savanna"); }
+                    else if biome == "Savanna" { set("biome_type", "Desert"); }
+                    else if biome == "TemperateForest" { set("biome_type", "Grassland"); }
+                    set("transition_pressure", 0.0);
+                }
+                if pressure > threshold {
+                    if biome == "Desert" { set("biome_type", "Savanna"); }
+                    else if biome == "Savanna" { set("biome_type", "Grassland"); }
+                    set("transition_pressure", 0.0);
+                }
+                "#,
+            )],
+        );
+
+        let engine = RuleEngine::new(dir.path(), 100).unwrap();
+        let mut world = generate_world(&default_gen_params(500));
+
+        // Count initial deserts
+        let count_deserts = |w: &World| -> usize {
+            w.tiles.iter()
+                .filter(|t| t.biome.biome_type == BiomeType::Desert)
+                .count()
+        };
+        let land_count = world.tiles.iter()
+            .filter(|t| t.geology.terrain_type != crate::world::tile::TerrainType::Ocean)
+            .count();
+        let initial_deserts = count_deserts(&world);
+
+        // Run 1000 ticks
+        for _ in 0..1000 {
+            execute_tick(&mut world, &engine, 100);
+        }
+
+        let final_deserts = count_deserts(&world);
+        let desert_increase = if final_deserts > initial_deserts {
+            final_deserts - initial_deserts
+        } else {
+            0
+        };
+        let max_increase = land_count / 10; // 10% of land tiles
+
+        assert!(
+            desert_increase <= max_increase,
+            "World desertified: desert count went from {} to {} (+{}) but max allowed increase is {} (10% of {} land tiles)",
+            initial_deserts, final_deserts, desert_increase, max_increase, land_count
+        );
+    }
+
     // NOTE: The native-vs-Rhai parity test was removed because the native
     // evaluator now intentionally diverges from Rhai behavior. The native path
     // chains rule outputs via WeatherAccum (so Rule 3 reads Rule 2's humidity,
     // Rule 4 reads Rule 3's cloud_cover, etc.), while Rhai scripts each read
     // from the pre-phase tile snapshot. The native behavior is correct; the
     // Rhai scripts have the snapshot-read bug but are kept as reference.
+
+    #[test]
+    fn test_advection_moves_humidity_inland() {
+        // Geodesic world: after N ticks with native weather, coastal land tiles
+        // should have higher humidity than far-interior land tiles, because
+        // ocean moisture advects along wind patterns.
+        let dir = TempDir::new().unwrap();
+        setup_empty_rule_dirs(dir.path());
+
+        // Minimal conditions rule to keep soil moisture feedback working
+        make_rule_dir(
+            dir.path(),
+            "conditions",
+            &[(
+                "01-moisture.rhai",
+                r#"
+                let precip = tile.weather.precipitation;
+                let drainage = tile.geology.drainage;
+                let current = tile.conditions.soil_moisture;
+                let added = precip * 0.3;
+                let drained = current * drainage * 0.1;
+                let new_moisture = current + added - drained;
+                if new_moisture < 0.0 { set("soil_moisture", 0.0); }
+                else if new_moisture > 1.0 { set("soil_moisture", 1.0); }
+                else { set("soil_moisture", new_moisture); }
+                "#,
+            )],
+        );
+
+        let mut engine = RuleEngine::new(dir.path(), 100).unwrap();
+
+        // Use geodesic world for realistic lat/lon
+        let params = GenerationParams {
+            seed: 42,
+            tile_count: 1000,
+            ocean_ratio: 0.4,
+            mountain_ratio: 0.1,
+            elevation_roughness: 0.5,
+            climate_bands: true,
+            resource_density: 0.3,
+            initial_biome_maturity: 0.5,
+            topology: crate::config::generation::TopologyConfig {
+                mode: "geodesic".to_string(),
+                subdivision_level: 2,
+            },
+        };
+        let mut world = generate_world(&params);
+
+        // Register native weather evaluator with bearings
+        use crate::simulation::native_weather::NativeWeatherEvaluator;
+        engine.register_native_evaluator(Box::new(NativeWeatherEvaluator::new(&world.tiles)));
+
+        // Classify tiles: coastal land (has ocean neighbor) vs interior land (no ocean neighbor)
+        let ocean_set: std::collections::HashSet<usize> = world.tiles.iter()
+            .enumerate()
+            .filter(|(_, t)| t.geology.terrain_type == TerrainType::Ocean)
+            .map(|(i, _)| i)
+            .collect();
+
+        let coastal_land: Vec<usize> = world.tiles.iter()
+            .enumerate()
+            .filter(|(_, t)| {
+                t.geology.terrain_type != TerrainType::Ocean
+                    && t.neighbors.iter().any(|&nid| ocean_set.contains(&(nid as usize)))
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        let interior_land: Vec<usize> = world.tiles.iter()
+            .enumerate()
+            .filter(|(_, t)| {
+                t.geology.terrain_type != TerrainType::Ocean
+                    && !t.neighbors.iter().any(|&nid| ocean_set.contains(&(nid as usize)))
+                    // Also exclude tiles adjacent to coastal tiles (2-hop from ocean)
+                    && !t.neighbors.iter().any(|&nid| coastal_land.contains(&(nid as usize)))
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        // Run 50 ticks to let advection stabilize
+        for _ in 0..50 {
+            execute_tick(&mut world, &engine, 100);
+        }
+
+        // Compare average humidity: coastal land should be higher than deep interior
+        if !coastal_land.is_empty() && !interior_land.is_empty() {
+            let avg_coastal: f64 = coastal_land.iter()
+                .map(|&i| world.tiles[i].weather.humidity as f64)
+                .sum::<f64>() / coastal_land.len() as f64;
+            let avg_interior: f64 = interior_land.iter()
+                .map(|&i| world.tiles[i].weather.humidity as f64)
+                .sum::<f64>() / interior_land.len() as f64;
+
+            assert!(avg_coastal > avg_interior,
+                "Coastal land avg humidity ({:.3}, n={}) should exceed deep interior ({:.3}, n={}) after advection",
+                avg_coastal, coastal_land.len(), avg_interior, interior_land.len());
+        }
+    }
 }

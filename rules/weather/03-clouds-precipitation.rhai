@@ -119,8 +119,8 @@ if relative_humidity > 0.70 && new_cloud > 0.35 {
             set("precipitation_type", "Rain");      // above freezing: rain
         }
 
-        // Precipitation removes moisture from the air
-        let consumed = intensity * 0.25;
+        // Precipitation removes moisture — scale with available humidity
+        let consumed = intensity * 0.15 * humidity;
         let new_h = humidity - consumed;
         if new_h < 0.02 { new_h = 0.02; }  // atmosphere always has trace moisture
         set("humidity", new_h);

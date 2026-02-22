@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::config::generation::GenerationParams;
 use crate::world::tile::*;
 use crate::world::topology::{generate_flat_hex_grid, generate_geodesic_grid, grid_dimensions};
+use crate::world::weather_systems::MacroWeatherState;
 use crate::world::World;
 
 /// Generate a new world from the given parameters.
@@ -72,6 +73,7 @@ pub fn generate_world(params: &GenerationParams) -> World {
         generation_params: resolved_params,
         snapshot_path: None,
         tiles,
+        macro_weather: MacroWeatherState::with_seed(seed),
     }
 }
 

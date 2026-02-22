@@ -1,0 +1,21 @@
+---
+observation_id: 7cf48459-8609-4195-a45f-a286b2c31559
+timestamp: 2026-02-21T22:59:39Z
+session_type: product_use
+session_context:
+  product_classification: "functional"
+  framework_version: 0120f4c
+observations:
+  - type: defect
+    stage: 6
+    severity: note
+    description: "Catastrophic desertification from humidity blending formula: when macro weather coverage is absent or weak, a fixed 0.6 macro weight causes 73% humidity loss per tick, collapsing all non-ocean tiles to desert within ~100 ticks. Fix: make macro weight proportional to coverage strength."
+    evidence: "Original: macro_humidity*0.6 + current*0.2 + evap + diffused*0.04. When macro_humidity=0: retention=27%. Fix: dynamic macro_weight=min(macro_humidity*3.5, 0.35)."
+    status: acted_on
+    root_cause_analysis:
+      symptom: "All land tiles desertify within 100 ticks without macro weather coverage"
+      root_cause: "Fixed weight blending formula destroyed local humidity when macro source absent"
+      category: wrong_abstraction
+skills_affected:
+  - "none"
+---

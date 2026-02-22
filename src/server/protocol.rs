@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use crate::simulation::statistics::TickStatistics;
 use crate::world::tile::*;
+use crate::world::weather_systems::PressureSystem;
 use crate::world::World;
 
 /// Complete world state sent to a client on connect.
@@ -17,6 +18,7 @@ pub struct WorldSnapshot {
     pub tile_count: u32,
     pub topology_type: TopologyType,
     pub tiles: Vec<TileSnapshot>,
+    pub pressure_systems: Vec<PressureSystemSnapshot>,
 }
 
 /// A tile's complete state in a snapshot.
@@ -40,6 +42,7 @@ pub struct TickDiff {
     pub season: Season,
     pub changed_tiles: Vec<TileChange>,
     pub statistics: TickStatSummary,
+    pub pressure_systems: Vec<PressureSystemSnapshot>,
 }
 
 /// Changed fields for a single tile in a diff.
@@ -69,6 +72,32 @@ pub struct TickStatSummary {
     pub tick_duration_ms: f32,
 }
 
+/// Snapshot of a pressure system for the wire protocol.
+#[derive(Debug, Clone, Serialize)]
+pub struct PressureSystemSnapshot {
+    pub id: u32,
+    pub lat: f64,
+    pub lon: f64,
+    pub pressure_anomaly: f32,
+    pub radius: f32,
+    pub system_type: String,
+    pub moisture: f32,
+}
+
+impl PressureSystemSnapshot {
+    pub fn from_system(sys: &PressureSystem) -> Self {
+        PressureSystemSnapshot {
+            id: sys.id,
+            lat: sys.lat,
+            lon: sys.lon,
+            pressure_anomaly: sys.pressure_anomaly,
+            radius: sys.radius,
+            system_type: format!("{:?}", sys.system_type),
+            moisture: sys.moisture,
+        }
+    }
+}
+
 /// Health endpoint response.
 #[derive(Debug, Clone, Serialize)]
 pub struct HealthStatus {
@@ -93,6 +122,12 @@ impl WorldSnapshot {
             tile_count: world.tile_count,
             topology_type: world.topology_type,
             tiles: world.tiles.iter().map(TileSnapshot::from_tile).collect(),
+            pressure_systems: world
+                .macro_weather
+                .systems
+                .iter()
+                .map(PressureSystemSnapshot::from_system)
+                .collect(),
         }
     }
 }
@@ -204,6 +239,7 @@ mod tests {
                 topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
+            macro_weather: Default::default(),
             tiles: vec![make_tile(0), make_tile(1), make_tile(2)],
         };
 
@@ -239,6 +275,7 @@ mod tests {
                 topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
+            macro_weather: Default::default(),
             tiles: vec![make_tile(0)],
         };
 
@@ -314,6 +351,10 @@ mod tests {
                     cloud_cover: 0.9,
                     humidity: 0.7,
                     storm_intensity: 0.3,
+                    pressure: 1013.25,
+                    macro_wind_speed: 0.0,
+                    macro_wind_direction: 0.0,
+                    macro_humidity: 0.0,
                 }),
                 conditions: None,
                 biome: None,
@@ -329,6 +370,7 @@ mod tests {
                 rule_errors: 0,
                 tick_duration_ms: 50.0,
             },
+            pressure_systems: vec![],
         };
 
         let json = serde_json::to_string(&diff).expect("serialization should succeed");

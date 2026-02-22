@@ -51,8 +51,16 @@ pub async fn run_simulation(
 
     // 2. Load rules
     let rule_dir = Path::new(&config.rule_directory);
-    let engine = RuleEngine::new(rule_dir, config.rule_timeout_ms as u64)
+    let mut engine = RuleEngine::new(rule_dir, config.rule_timeout_ms as u64)
         .map_err(|e| format!("Failed to load rules: {}", e))?;
+
+    // Register native evaluators when enabled (default: true)
+    if config.native_evaluation {
+        use crate::simulation::native_weather::NativeWeatherEvaluator;
+        engine.register_native_evaluator(Box::new(NativeWeatherEvaluator::new(&world.tiles)));
+        info!("Native weather evaluation enabled");
+    }
+
     info!(dir = %config.rule_directory, "Rules loaded");
 
     // 3. Build initial snapshot JSON and create server state
@@ -105,6 +113,7 @@ pub async fn run_simulation(
             world.tick_count,
             world.season,
             &result.statistics,
+            &world.macro_weather.systems,
         );
 
         // Rebuild full snapshot JSON periodically (every 10 ticks) instead of every tick.

@@ -1,0 +1,21 @@
+---
+observation_id: 774a2e4b-1bc1-4c13-9622-1e3acb159c40
+timestamp: 2026-02-21T23:46:47Z
+session_type: product_use
+session_context:
+  product_classification: "entertainment"
+  framework_version: 68bab2a
+observations:
+  - type: process_friction
+    stage: 6
+    severity: note
+    description: "Weather simulation tuning required two iteration rounds to converge on acceptable visual behavior. Initial fix solved catastrophic ocean-only clouds but revealed secondary issues (polar overload, no land clouds). Multiple interconnected parameters needed simultaneous adjustment."
+    evidence: "Round 1: evaporation diminishing returns. Round 2: saturation base 0.08->0.40, maritime moisture boost, flattened cloud curve, viewer alpha cc^2->cc^1.5. Both rounds passed 185 tests."
+    status: noted
+    root_cause_analysis:
+      symptom: "First tuning pass fixed one visual symptom but exposed others"
+      root_cause: "Simulation weather parameters are tightly coupled — saturation formula, humidity sources, cloud formation curve, and rendering alpha all interact to produce the visual result"
+      category: wrong_abstraction
+skills_affected:
+  - "none"
+---

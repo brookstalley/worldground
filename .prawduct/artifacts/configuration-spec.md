@@ -17,6 +17,7 @@
 | log_level | String | "info" | Logging verbosity |
 | season_length | u32 | 90 | Ticks per season |
 | rule_timeout_ms | u64 | 10 | Per-tile rule execution limit |
+| native_evaluation | bool | true | Enable native Rust evaluation for weather phase, bypassing Rhai for ~10x speedup |
 
 ## World Generation Configuration (worldgen.toml)
 

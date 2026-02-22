@@ -74,6 +74,7 @@ pub struct RuleEngine {
     engine: Engine,
     rules: HashMap<Phase, Vec<CompiledRule>>,
     timeout_ms: u64,
+    native_evaluators: HashMap<Phase, Box<dyn super::native_eval::NativePhaseEvaluator>>,
 }
 
 impl RuleEngine {
@@ -131,8 +132,10 @@ impl RuleEngine {
         engine.register_fn("abs", |v: f64| -> f64 { v.abs() });
         engine.register_fn("clamp", |v: f64, min: f64, max: f64| -> f64 { v.clamp(min, max) });
 
-        // Native acceleration: compute wind-direction alignment between two points.
-        // Returns dot product of the wind vector with the normalized direction from→to.
+        // LEGACY: Planar wind alignment — uses 2D (x,y) which is incorrect on geodesic
+        // grids where position.x/y are 3D sphere coordinates. Kept for backwards
+        // compatibility with custom rules. Core weather rules now use macro_wind_*
+        // fields projected by the macro weather engine (sphere_math.rs).
         engine.register_fn(
             "wind_align",
             |from_x: f64, from_y: f64, to_x: f64, to_y: f64, wind_dir: f64| -> f64 {
@@ -148,8 +151,7 @@ impl RuleEngine {
             },
         );
 
-        // Native acceleration: normalized direction vector between two points.
-        // Returns [nx, ny] or [0, 0] if coincident.
+        // LEGACY: Planar direction — same caveat as wind_align above.
         engine.register_fn(
             "direction_to",
             |from_x: f64, from_y: f64, to_x: f64, to_y: f64| -> Array {
@@ -221,10 +223,27 @@ impl RuleEngine {
             engine,
             rules: HashMap::new(),
             timeout_ms,
+            native_evaluators: HashMap::new(),
         };
 
         rule_engine.load_rules(rule_dir)?;
         Ok(rule_engine)
+    }
+
+    /// Enable native evaluation for a phase, bypassing Rhai.
+    pub fn register_native_evaluator(&mut self, evaluator: Box<dyn super::native_eval::NativePhaseEvaluator>) {
+        let phase = evaluator.phase();
+        self.native_evaluators.insert(phase, evaluator);
+    }
+
+    /// Check if a native evaluator is registered for a phase.
+    pub fn has_native_evaluator(&self, phase: Phase) -> bool {
+        self.native_evaluators.contains_key(&phase)
+    }
+
+    /// Get the native evaluator for a phase.
+    pub fn native_evaluator(&self, phase: Phase) -> Option<&dyn super::native_eval::NativePhaseEvaluator> {
+        self.native_evaluators.get(&phase).map(|e| e.as_ref())
     }
 
     fn load_rules(&mut self, rule_dir: &Path) -> Result<(), String> {
@@ -469,6 +488,69 @@ fn get_nested_f64(dyn_val: &Dynamic, path: &str) -> Option<f64> {
     field_val.as_float().ok()
 }
 
+/// Static string for TerrainType (avoids format!("{:?}") allocation).
+pub fn terrain_type_str(t: TerrainType) -> &'static str {
+    match t {
+        TerrainType::Ocean => "Ocean",
+        TerrainType::Coast => "Coast",
+        TerrainType::Plains => "Plains",
+        TerrainType::Hills => "Hills",
+        TerrainType::Mountains => "Mountains",
+        TerrainType::Cliffs => "Cliffs",
+        TerrainType::Wetlands => "Wetlands",
+    }
+}
+
+/// Static string for SoilType.
+pub fn soil_type_str(t: SoilType) -> &'static str {
+    match t {
+        SoilType::Sand => "Sand",
+        SoilType::Clay => "Clay",
+        SoilType::Loam => "Loam",
+        SoilType::Rock => "Rock",
+        SoilType::Silt => "Silt",
+    }
+}
+
+/// Static string for ClimateZone.
+pub fn climate_zone_str(z: ClimateZone) -> &'static str {
+    match z {
+        ClimateZone::Polar => "Polar",
+        ClimateZone::Subpolar => "Subpolar",
+        ClimateZone::Temperate => "Temperate",
+        ClimateZone::Subtropical => "Subtropical",
+        ClimateZone::Tropical => "Tropical",
+    }
+}
+
+/// Static string for BiomeType.
+pub fn biome_type_str(b: BiomeType) -> &'static str {
+    match b {
+        BiomeType::Ocean => "Ocean",
+        BiomeType::Ice => "Ice",
+        BiomeType::Tundra => "Tundra",
+        BiomeType::BorealForest => "BorealForest",
+        BiomeType::TemperateForest => "TemperateForest",
+        BiomeType::Grassland => "Grassland",
+        BiomeType::Savanna => "Savanna",
+        BiomeType::Desert => "Desert",
+        BiomeType::TropicalForest => "TropicalForest",
+        BiomeType::Wetland => "Wetland",
+        BiomeType::Barren => "Barren",
+    }
+}
+
+/// Static string for PrecipitationType.
+pub fn precipitation_type_str(p: PrecipitationType) -> &'static str {
+    match p {
+        PrecipitationType::None => "None",
+        PrecipitationType::Rain => "Rain",
+        PrecipitationType::Snow => "Snow",
+        PrecipitationType::Hail => "Hail",
+        PrecipitationType::Sleet => "Sleet",
+    }
+}
+
 /// Convert a Tile to a Rhai Map for script access.
 pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     let mut map = Map::new();
@@ -485,12 +567,12 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     let mut geo = Map::new();
     geo.insert(
         "terrain_type".into(),
-        Dynamic::from(format!("{:?}", tile.geology.terrain_type)),
+        Dynamic::from(terrain_type_str(tile.geology.terrain_type).to_string()),
     );
     geo.insert("elevation".into(), Dynamic::from(tile.geology.elevation as f64));
     geo.insert(
         "soil_type".into(),
-        Dynamic::from(format!("{:?}", tile.geology.soil_type)),
+        Dynamic::from(soil_type_str(tile.geology.soil_type).to_string()),
     );
     geo.insert("drainage".into(), Dynamic::from(tile.geology.drainage as f64));
     geo.insert(
@@ -503,7 +585,7 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     let mut climate = Map::new();
     climate.insert(
         "zone".into(),
-        Dynamic::from(format!("{:?}", tile.climate.zone)),
+        Dynamic::from(climate_zone_str(tile.climate.zone).to_string()),
     );
     climate.insert(
         "base_temperature".into(),
@@ -520,7 +602,7 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     let mut biome = Map::new();
     biome.insert(
         "biome_type".into(),
-        Dynamic::from(format!("{:?}", tile.biome.biome_type)),
+        Dynamic::from(biome_type_str(tile.biome.biome_type).to_string()),
     );
     biome.insert(
         "vegetation_density".into(),
@@ -552,7 +634,7 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     );
     weather.insert(
         "precipitation_type".into(),
-        Dynamic::from(format!("{:?}", tile.weather.precipitation_type)),
+        Dynamic::from(precipitation_type_str(tile.weather.precipitation_type).to_string()),
     );
     weather.insert(
         "wind_speed".into(),
@@ -573,6 +655,22 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
     weather.insert(
         "storm_intensity".into(),
         Dynamic::from(tile.weather.storm_intensity as f64),
+    );
+    weather.insert(
+        "pressure".into(),
+        Dynamic::from(tile.weather.pressure as f64),
+    );
+    weather.insert(
+        "macro_wind_speed".into(),
+        Dynamic::from(tile.weather.macro_wind_speed as f64),
+    );
+    weather.insert(
+        "macro_wind_direction".into(),
+        Dynamic::from(tile.weather.macro_wind_direction as f64),
+    );
+    weather.insert(
+        "macro_humidity".into(),
+        Dynamic::from(tile.weather.macro_humidity as f64),
     );
     map.insert("weather".into(), Dynamic::from(weather));
 
@@ -623,6 +721,273 @@ pub fn tile_to_rhai_map(tile: &Tile) -> Dynamic {
         })
         .collect();
     map.insert("resources".into(), Dynamic::from(res_list));
+
+    // Neighbor IDs
+    let neighbor_ids: Vec<Dynamic> = tile.neighbors.iter().map(|&n| Dynamic::from(n as i64)).collect();
+    map.insert("neighbor_ids".into(), Dynamic::from(neighbor_ids));
+
+    Dynamic::from(map)
+}
+
+/// Build the immutable portion of a tile's Rhai map (geology, climate, position, id, neighbor_ids).
+/// These fields never change during simulation and can be cached across phases within a tick.
+pub fn tile_immutable_rhai_map(tile: &Tile) -> Map {
+    let mut map = Map::new();
+
+    map.insert("id".into(), Dynamic::from(tile.id as i64));
+
+    // Position
+    let mut pos = Map::new();
+    pos.insert("x".into(), Dynamic::from(tile.position.x as f64));
+    pos.insert("y".into(), Dynamic::from(tile.position.y as f64));
+    map.insert("position".into(), Dynamic::from(pos));
+
+    // Geology layer
+    let mut geo = Map::new();
+    geo.insert(
+        "terrain_type".into(),
+        Dynamic::from(terrain_type_str(tile.geology.terrain_type).to_string()),
+    );
+    geo.insert("elevation".into(), Dynamic::from(tile.geology.elevation as f64));
+    geo.insert(
+        "soil_type".into(),
+        Dynamic::from(soil_type_str(tile.geology.soil_type).to_string()),
+    );
+    geo.insert("drainage".into(), Dynamic::from(tile.geology.drainage as f64));
+    geo.insert(
+        "tectonic_stress".into(),
+        Dynamic::from(tile.geology.tectonic_stress as f64),
+    );
+    map.insert("geology".into(), Dynamic::from(geo));
+
+    // Climate layer
+    let mut climate = Map::new();
+    climate.insert(
+        "zone".into(),
+        Dynamic::from(climate_zone_str(tile.climate.zone).to_string()),
+    );
+    climate.insert(
+        "base_temperature".into(),
+        Dynamic::from(tile.climate.base_temperature as f64),
+    );
+    climate.insert(
+        "base_precipitation".into(),
+        Dynamic::from(tile.climate.base_precipitation as f64),
+    );
+    climate.insert("latitude".into(), Dynamic::from(tile.climate.latitude as f64));
+    map.insert("climate".into(), Dynamic::from(climate));
+
+    // Neighbor IDs
+    let neighbor_ids: Vec<Dynamic> = tile.neighbors.iter().map(|&n| Dynamic::from(n as i64)).collect();
+    map.insert("neighbor_ids".into(), Dynamic::from(neighbor_ids));
+
+    map
+}
+
+/// Build the mutable portion of a tile's Rhai map on top of a cached immutable base.
+/// Clones the base and adds weather, conditions, biome, and optionally resources.
+pub fn tile_mutable_rhai_map(base: &Map, tile: &Tile, phase: Phase) -> Dynamic {
+    let mut map = base.clone();
+
+    // Biome layer
+    let mut biome = Map::new();
+    biome.insert(
+        "biome_type".into(),
+        Dynamic::from(biome_type_str(tile.biome.biome_type).to_string()),
+    );
+    biome.insert(
+        "vegetation_density".into(),
+        Dynamic::from(tile.biome.vegetation_density as f64),
+    );
+    biome.insert(
+        "vegetation_health".into(),
+        Dynamic::from(tile.biome.vegetation_health as f64),
+    );
+    biome.insert(
+        "transition_pressure".into(),
+        Dynamic::from(tile.biome.transition_pressure as f64),
+    );
+    biome.insert(
+        "ticks_in_current_biome".into(),
+        Dynamic::from(tile.biome.ticks_in_current_biome as i64),
+    );
+    map.insert("biome".into(), Dynamic::from(biome));
+
+    // Weather layer
+    let mut weather = Map::new();
+    weather.insert("temperature".into(), Dynamic::from(tile.weather.temperature as f64));
+    weather.insert("precipitation".into(), Dynamic::from(tile.weather.precipitation as f64));
+    weather.insert(
+        "precipitation_type".into(),
+        Dynamic::from(precipitation_type_str(tile.weather.precipitation_type).to_string()),
+    );
+    weather.insert("wind_speed".into(), Dynamic::from(tile.weather.wind_speed as f64));
+    weather.insert("wind_direction".into(), Dynamic::from(tile.weather.wind_direction as f64));
+    weather.insert("cloud_cover".into(), Dynamic::from(tile.weather.cloud_cover as f64));
+    weather.insert("humidity".into(), Dynamic::from(tile.weather.humidity as f64));
+    weather.insert("storm_intensity".into(), Dynamic::from(tile.weather.storm_intensity as f64));
+    weather.insert("pressure".into(), Dynamic::from(tile.weather.pressure as f64));
+    weather.insert("macro_wind_speed".into(), Dynamic::from(tile.weather.macro_wind_speed as f64));
+    weather.insert("macro_wind_direction".into(), Dynamic::from(tile.weather.macro_wind_direction as f64));
+    weather.insert("macro_humidity".into(), Dynamic::from(tile.weather.macro_humidity as f64));
+    map.insert("weather".into(), Dynamic::from(weather));
+
+    // Conditions layer
+    let mut conditions = Map::new();
+    conditions.insert("soil_moisture".into(), Dynamic::from(tile.conditions.soil_moisture as f64));
+    conditions.insert("snow_depth".into(), Dynamic::from(tile.conditions.snow_depth as f64));
+    conditions.insert("mud_level".into(), Dynamic::from(tile.conditions.mud_level as f64));
+    conditions.insert("flood_level".into(), Dynamic::from(tile.conditions.flood_level as f64));
+    conditions.insert("frost_days".into(), Dynamic::from(tile.conditions.frost_days as i64));
+    conditions.insert("drought_days".into(), Dynamic::from(tile.conditions.drought_days as i64));
+    conditions.insert("fire_risk".into(), Dynamic::from(tile.conditions.fire_risk as f64));
+    map.insert("conditions".into(), Dynamic::from(conditions));
+
+    // Resources: only build for Resources phase
+    if phase == Phase::Resources {
+        let res_list: Vec<Dynamic> = tile
+            .resources
+            .resources
+            .iter()
+            .map(|r| {
+                let mut rm = Map::new();
+                rm.insert("resource_type".into(), Dynamic::from(r.resource_type.clone()));
+                rm.insert("quantity".into(), Dynamic::from(r.quantity as f64));
+                rm.insert("max_quantity".into(), Dynamic::from(r.max_quantity as f64));
+                rm.insert("renewal_rate".into(), Dynamic::from(r.renewal_rate as f64));
+                Dynamic::from(rm)
+            })
+            .collect();
+        map.insert("resources".into(), Dynamic::from(res_list));
+    } else {
+        let empty: Vec<Dynamic> = Vec::new();
+        map.insert("resources".into(), Dynamic::from(empty));
+    }
+
+    Dynamic::from(map)
+}
+
+/// Convert a Tile to a Rhai Map, skipping expensive resources array for non-resources phases.
+pub fn tile_to_rhai_map_for_phase(tile: &Tile, phase: Phase) -> Dynamic {
+    let mut map = Map::new();
+
+    map.insert("id".into(), Dynamic::from(tile.id as i64));
+
+    // Position
+    let mut pos = Map::new();
+    pos.insert("x".into(), Dynamic::from(tile.position.x as f64));
+    pos.insert("y".into(), Dynamic::from(tile.position.y as f64));
+    map.insert("position".into(), Dynamic::from(pos));
+
+    // Geology layer
+    let mut geo = Map::new();
+    geo.insert(
+        "terrain_type".into(),
+        Dynamic::from(terrain_type_str(tile.geology.terrain_type).to_string()),
+    );
+    geo.insert("elevation".into(), Dynamic::from(tile.geology.elevation as f64));
+    geo.insert(
+        "soil_type".into(),
+        Dynamic::from(soil_type_str(tile.geology.soil_type).to_string()),
+    );
+    geo.insert("drainage".into(), Dynamic::from(tile.geology.drainage as f64));
+    geo.insert(
+        "tectonic_stress".into(),
+        Dynamic::from(tile.geology.tectonic_stress as f64),
+    );
+    map.insert("geology".into(), Dynamic::from(geo));
+
+    // Climate layer
+    let mut climate = Map::new();
+    climate.insert(
+        "zone".into(),
+        Dynamic::from(climate_zone_str(tile.climate.zone).to_string()),
+    );
+    climate.insert(
+        "base_temperature".into(),
+        Dynamic::from(tile.climate.base_temperature as f64),
+    );
+    climate.insert(
+        "base_precipitation".into(),
+        Dynamic::from(tile.climate.base_precipitation as f64),
+    );
+    climate.insert("latitude".into(), Dynamic::from(tile.climate.latitude as f64));
+    map.insert("climate".into(), Dynamic::from(climate));
+
+    // Biome layer
+    let mut biome = Map::new();
+    biome.insert(
+        "biome_type".into(),
+        Dynamic::from(biome_type_str(tile.biome.biome_type).to_string()),
+    );
+    biome.insert(
+        "vegetation_density".into(),
+        Dynamic::from(tile.biome.vegetation_density as f64),
+    );
+    biome.insert(
+        "vegetation_health".into(),
+        Dynamic::from(tile.biome.vegetation_health as f64),
+    );
+    biome.insert(
+        "transition_pressure".into(),
+        Dynamic::from(tile.biome.transition_pressure as f64),
+    );
+    biome.insert(
+        "ticks_in_current_biome".into(),
+        Dynamic::from(tile.biome.ticks_in_current_biome as i64),
+    );
+    map.insert("biome".into(), Dynamic::from(biome));
+
+    // Weather layer
+    let mut weather = Map::new();
+    weather.insert("temperature".into(), Dynamic::from(tile.weather.temperature as f64));
+    weather.insert("precipitation".into(), Dynamic::from(tile.weather.precipitation as f64));
+    weather.insert(
+        "precipitation_type".into(),
+        Dynamic::from(precipitation_type_str(tile.weather.precipitation_type).to_string()),
+    );
+    weather.insert("wind_speed".into(), Dynamic::from(tile.weather.wind_speed as f64));
+    weather.insert("wind_direction".into(), Dynamic::from(tile.weather.wind_direction as f64));
+    weather.insert("cloud_cover".into(), Dynamic::from(tile.weather.cloud_cover as f64));
+    weather.insert("humidity".into(), Dynamic::from(tile.weather.humidity as f64));
+    weather.insert("storm_intensity".into(), Dynamic::from(tile.weather.storm_intensity as f64));
+    weather.insert("pressure".into(), Dynamic::from(tile.weather.pressure as f64));
+    weather.insert("macro_wind_speed".into(), Dynamic::from(tile.weather.macro_wind_speed as f64));
+    weather.insert("macro_wind_direction".into(), Dynamic::from(tile.weather.macro_wind_direction as f64));
+    weather.insert("macro_humidity".into(), Dynamic::from(tile.weather.macro_humidity as f64));
+    map.insert("weather".into(), Dynamic::from(weather));
+
+    // Conditions layer
+    let mut conditions = Map::new();
+    conditions.insert("soil_moisture".into(), Dynamic::from(tile.conditions.soil_moisture as f64));
+    conditions.insert("snow_depth".into(), Dynamic::from(tile.conditions.snow_depth as f64));
+    conditions.insert("mud_level".into(), Dynamic::from(tile.conditions.mud_level as f64));
+    conditions.insert("flood_level".into(), Dynamic::from(tile.conditions.flood_level as f64));
+    conditions.insert("frost_days".into(), Dynamic::from(tile.conditions.frost_days as i64));
+    conditions.insert("drought_days".into(), Dynamic::from(tile.conditions.drought_days as i64));
+    conditions.insert("fire_risk".into(), Dynamic::from(tile.conditions.fire_risk as f64));
+    map.insert("conditions".into(), Dynamic::from(conditions));
+
+    // Resources: only build for Resources phase, empty vec otherwise
+    if phase == Phase::Resources {
+        let res_list: Vec<Dynamic> = tile
+            .resources
+            .resources
+            .iter()
+            .map(|r| {
+                let mut rm = Map::new();
+                rm.insert("resource_type".into(), Dynamic::from(r.resource_type.clone()));
+                rm.insert("quantity".into(), Dynamic::from(r.quantity as f64));
+                rm.insert("max_quantity".into(), Dynamic::from(r.max_quantity as f64));
+                rm.insert("renewal_rate".into(), Dynamic::from(r.renewal_rate as f64));
+                Dynamic::from(rm)
+            })
+            .collect();
+        map.insert("resources".into(), Dynamic::from(res_list));
+    } else {
+        let empty: Vec<Dynamic> = Vec::new();
+        map.insert("resources".into(), Dynamic::from(empty));
+    }
 
     // Neighbor IDs
     let neighbor_ids: Vec<Dynamic> = tile.neighbors.iter().map(|&n| Dynamic::from(n as i64)).collect();
@@ -1208,6 +1573,74 @@ mod tests {
 
         let b = xorshift64(a1);
         assert_ne!(a1, b);
+    }
+
+    #[test]
+    fn immutable_map_contents_match_full() {
+        let tile = make_test_tile();
+        let full = tile_to_rhai_map(&tile);
+        let full_map = full.cast::<Map>();
+
+        let immut = tile_immutable_rhai_map(&tile);
+        let combined = tile_mutable_rhai_map(&immut, &tile, Phase::Resources);
+        let combined_map = combined.cast::<Map>();
+
+        // Check all keys present in both
+        for key in full_map.keys() {
+            assert!(
+                combined_map.contains_key(key.as_str()),
+                "Combined map missing key: {}",
+                key
+            );
+        }
+
+        // Verify field counts match
+        assert_eq!(full_map.len(), combined_map.len(), "Key count mismatch");
+
+        // Verify specific values match
+        let full_id = full_map.get("id").unwrap().as_int().unwrap();
+        let combined_id = combined_map.get("id").unwrap().as_int().unwrap();
+        assert_eq!(full_id, combined_id);
+    }
+
+    #[test]
+    fn enum_string_helpers_match_debug() {
+        // Verify static strings match format!("{:?}") for all variants
+        use crate::world::tile::*;
+
+        for t in [
+            TerrainType::Ocean, TerrainType::Coast, TerrainType::Plains,
+            TerrainType::Hills, TerrainType::Mountains, TerrainType::Cliffs,
+            TerrainType::Wetlands,
+        ] {
+            assert_eq!(terrain_type_str(t), format!("{:?}", t));
+        }
+
+        for s in [SoilType::Sand, SoilType::Clay, SoilType::Loam, SoilType::Rock, SoilType::Silt] {
+            assert_eq!(soil_type_str(s), format!("{:?}", s));
+        }
+
+        for z in [
+            ClimateZone::Polar, ClimateZone::Subpolar, ClimateZone::Temperate,
+            ClimateZone::Subtropical, ClimateZone::Tropical,
+        ] {
+            assert_eq!(climate_zone_str(z), format!("{:?}", z));
+        }
+
+        for b in [
+            BiomeType::Ocean, BiomeType::Ice, BiomeType::Tundra, BiomeType::BorealForest,
+            BiomeType::TemperateForest, BiomeType::Grassland, BiomeType::Savanna,
+            BiomeType::Desert, BiomeType::TropicalForest, BiomeType::Wetland, BiomeType::Barren,
+        ] {
+            assert_eq!(biome_type_str(b), format!("{:?}", b));
+        }
+
+        for p in [
+            PrecipitationType::None, PrecipitationType::Rain, PrecipitationType::Snow,
+            PrecipitationType::Hail, PrecipitationType::Sleet,
+        ] {
+            assert_eq!(precipitation_type_str(p), format!("{:?}", p));
+        }
     }
 
     #[test]

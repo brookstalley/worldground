@@ -25,6 +25,6 @@ resource_density = 0.3
 initial_biome_maturity = 0.5
 
 # Topology: "flat" (default hex grid) or "geodesic" (icosphere)
-# [topology]
-# mode = "flat"
-# subdivision_level = 4  # geodesic only: 1-7, level 4 = 2,562 tiles
+[topology]
+mode = "geodesic"
+subdivision_level = 5 # geodesic only: 1-7, level 4 = 2,562 tiles

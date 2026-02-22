@@ -31,3 +31,11 @@
 
 # Prawduct session traces (local-only, never shared automatically)
 .prawduct/traces/
+
+# Prawduct machine-specific files
+
+# Prawduct session files (ephemeral, machine-local)
+.prawduct/.active-products/
+.prawduct/.session.lock
+
+# Prawduct session traces (local-only, never shared automatically)

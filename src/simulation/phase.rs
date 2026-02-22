@@ -2,8 +2,9 @@ use rayon::prelude::*;
 use tracing::warn;
 
 use crate::simulation::engine::{
-    apply_mutations, tile_to_rhai_map, Phase, RuleEngine, RuleError, TileMutations,
+    apply_mutations, tile_mutable_rhai_map, Phase, RuleEngine, RuleError, TileMutations,
 };
+use crate::simulation::native_eval::NativePhaseEvaluator;
 use crate::world::tile::BiomeType;
 use crate::world::World;
 use rhai::Dynamic;
@@ -13,42 +14,45 @@ use rhai::Dynamic;
 /// Reads from a snapshot of current tile state (so all tiles in this phase
 /// see the same input), evaluates tiles in parallel via rayon, then writes
 /// mutations to the live tiles sequentially.
-/// Pre-converts all tiles to Rhai maps once per phase to avoid redundant conversions.
+/// Uses cached immutable maps to avoid rebuilding geology/climate/position each phase.
 pub fn execute_phase(
     world: &mut World,
     engine: &RuleEngine,
     phase: Phase,
+    immutable_maps: &[rhai::Map],
 ) -> Vec<RuleError> {
     let rules = engine.rules_for_phase(phase);
     if rules.is_empty() {
         return Vec::new();
     }
 
-    // Double buffer: snapshot current state for reading
-    let input_tiles = world.tiles.clone();
-
-    // Pre-convert all tiles to Rhai maps once (avoids re-converting neighbors repeatedly)
-    let tile_maps: Vec<Dynamic> = input_tiles.iter().map(|t| tile_to_rhai_map(t)).collect();
+    // Build Rhai maps from current (pre-mutation) state — these serve as the snapshot.
+    // Uses cached immutable maps + current mutable state per tile.
+    let tile_maps: Vec<Dynamic> = world.tiles.iter().enumerate()
+        .map(|(i, t)| tile_mutable_rhai_map(&immutable_maps[i], t, phase))
+        .collect();
+    // Extract neighbor lists for the par_iter closure (since we won't clone tiles)
+    let neighbor_lists: Vec<Vec<u32>> = world.tiles.iter().map(|t| t.neighbors.clone()).collect();
 
     // Capture values needed by the parallel closure (avoids borrowing `world` across par_iter)
     let tick_count = world.tick_count;
     let season = world.season;
+    let tile_count = world.tiles.len();
+    // Capture tile IDs for RNG seed computation (avoids borrowing world.tiles in par_iter)
+    let tile_ids: Vec<u32> = world.tiles.iter().map(|t| t.id).collect();
 
     // Parallel evaluation: each tile is independently evaluated by a rayon worker thread.
     // Thread-local MUTATIONS and RNG_STATE in engine.rs are per-worker, so this is safe.
-    let results: Vec<(usize, Result<TileMutations, RuleError>)> = (0..input_tiles.len())
+    let results: Vec<(usize, Result<TileMutations, RuleError>)> = (0..tile_count)
         .into_par_iter()
         .map(|i| {
-            let tile = &input_tiles[i];
-
             // Gather pre-converted neighbor maps
-            let neighbor_maps: Vec<Dynamic> = tile
-                .neighbors
+            let neighbor_maps: Vec<Dynamic> = neighbor_lists[i]
                 .iter()
                 .filter_map(|&nid| tile_maps.get(nid as usize).cloned())
                 .collect();
 
-            let rng_seed = compute_rng_seed(tick_count, tile.id, phase);
+            let rng_seed = compute_rng_seed(tick_count, tile_ids[i], phase);
 
             let result = engine.evaluate_tile_preconverted(
                 phase,
@@ -57,12 +61,19 @@ pub fn execute_phase(
                 &season,
                 tick_count,
                 rng_seed,
-                tile.id,
+                tile_ids[i],
             );
 
             (i, result)
         })
         .collect();
+
+    // For biome transition validation, we need the pre-phase biome types
+    let pre_phase_biome_types: Vec<BiomeType> = if phase == Phase::Terrain {
+        world.tiles.iter().map(|t| t.biome.biome_type).collect()
+    } else {
+        Vec::new()
+    };
 
     // Sequential: apply mutations to live tiles
     let mut errors = Vec::new();
@@ -70,7 +81,7 @@ pub fn execute_phase(
         match result {
             Ok(mutations) => {
                 let mutations = if phase == Phase::Terrain {
-                    filter_invalid_biome_transitions(&input_tiles[i], mutations)
+                    filter_invalid_biome_transitions_by_biome(pre_phase_biome_types[i], mutations)
                 } else {
                     mutations
                 };
@@ -83,6 +94,57 @@ pub fn execute_phase(
     }
 
     errors
+}
+
+/// Execute a single phase natively (no Rhai) using a NativePhaseEvaluator.
+///
+/// Borrows world.tiles immutably during parallel evaluation, collects all mutations,
+/// then applies them sequentially. Double-buffer semantics are preserved because
+/// no tile is mutated during parallel evaluation.
+pub fn execute_phase_native(
+    world: &mut World,
+    evaluator: &dyn NativePhaseEvaluator,
+    phase: Phase,
+) -> Vec<RuleError> {
+    let tick_count = world.tick_count;
+    let season = world.season;
+
+    let results: Vec<(usize, TileMutations)> = {
+        let tiles: &[crate::world::Tile] = &world.tiles;
+        (0..tiles.len())
+            .into_par_iter()
+            .map(|i| {
+                let tile = &tiles[i];
+                let neighbors: Vec<&crate::world::Tile> = tile
+                    .neighbors
+                    .iter()
+                    .filter_map(|&nid| tiles.get(nid as usize))
+                    .collect();
+                let rng_seed = compute_rng_seed(tick_count, tile.id, phase);
+                let mutations = evaluator.evaluate(tile, &neighbors, season, tick_count, rng_seed);
+                (i, mutations)
+            })
+            .collect()
+    };
+
+    // Extract pre-phase biome types for terrain validation
+    let pre_phase_biome_types: Vec<BiomeType> = if phase == Phase::Terrain {
+        world.tiles.iter().map(|t| t.biome.biome_type).collect()
+    } else {
+        Vec::new()
+    };
+
+    // Sequential: apply mutations to live tiles
+    for (i, mutations) in results {
+        let mutations = if phase == Phase::Terrain {
+            filter_invalid_biome_transitions_by_biome(pre_phase_biome_types[i], mutations)
+        } else {
+            mutations
+        };
+        apply_mutations(&mut world.tiles[i], &mutations, phase);
+    }
+
+    Vec::new()
 }
 
 /// Compute a deterministic RNG seed for a tile evaluation.
@@ -125,13 +187,11 @@ pub fn valid_transitions(biome: BiomeType) -> &'static [BiomeType] {
     }
 }
 
-/// Filter out invalid biome transitions from mutations.
-/// Invalid transitions are logged as warnings and removed.
-fn filter_invalid_biome_transitions(
-    current_tile: &crate::world::Tile,
+/// Filter out invalid biome transitions using just the biome type.
+fn filter_invalid_biome_transitions_by_biome(
+    current_biome: BiomeType,
     mut mutations: TileMutations,
 ) -> TileMutations {
-    let current_biome = current_tile.biome.biome_type;
     let valid = valid_transitions(current_biome);
 
     mutations.mutations.retain(|(field, value)| {
@@ -145,7 +205,6 @@ fn filter_invalid_biome_transitions(
                 }
                 if !valid.contains(&target) {
                     warn!(
-                        tile_id = current_tile.id,
                         from = ?current_biome,
                         to = ?target,
                         "Invalid biome transition rejected"
@@ -180,7 +239,7 @@ fn parse_biome_type(s: &str) -> Option<BiomeType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::simulation::engine::{Phase, RuleEngine, TileMutations};
+    use crate::simulation::engine::{tile_immutable_rhai_map, Phase, RuleEngine, TileMutations};
     use crate::world::tile::*;
     use rhai::Dynamic;
     use std::fs;
@@ -189,6 +248,10 @@ mod tests {
 
     fn make_test_tile(id: u32) -> crate::world::Tile {
         crate::world::Tile::new_default(id, vec![], Position::flat(0.0, 0.0))
+    }
+
+    fn build_immutable_maps(world: &crate::world::World) -> Vec<rhai::Map> {
+        world.tiles.iter().map(|t| tile_immutable_rhai_map(t)).collect()
     }
 
     fn setup_empty_rule_dirs(dir: &Path) {
@@ -232,11 +295,13 @@ mod tests {
                 topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
+            macro_weather: Default::default(),
             tiles: vec![make_test_tile(0), make_test_tile(1)],
         };
 
         let original = world.tiles.clone();
-        let errors = execute_phase(&mut world, &engine, Phase::Weather);
+        let immutable_maps = build_immutable_maps(&world);
+        let errors = execute_phase(&mut world, &engine, Phase::Weather, &immutable_maps);
 
         assert!(errors.is_empty());
         assert_eq!(world.tiles, original);
@@ -291,6 +356,7 @@ mod tests {
                 topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
+            macro_weather: Default::default(),
             tiles: vec![
                 {
                     let mut t = make_test_tile(0);
@@ -307,7 +373,8 @@ mod tests {
             ],
         };
 
-        execute_phase(&mut world, &engine, Phase::Weather);
+        let immutable_maps = build_immutable_maps(&world);
+        execute_phase(&mut world, &engine, Phase::Weather, &immutable_maps);
 
         // Tile 0 should see neighbor (tile 1) at 300.0 (pre-phase value)
         assert!((world.tiles[0].weather.temperature - 300.0).abs() < 0.01);
@@ -327,7 +394,7 @@ mod tests {
             mutations: vec![("biome_type".to_string(), Dynamic::from("Desert".to_string()))],
         };
 
-        let filtered = filter_invalid_biome_transitions(&tile, mutations);
+        let filtered = filter_invalid_biome_transitions_by_biome(tile.biome.biome_type, mutations);
         // The biome_type mutation should have been removed
         assert!(
             !filtered
@@ -353,7 +420,7 @@ mod tests {
             )],
         };
 
-        let filtered = filter_invalid_biome_transitions(&tile, mutations);
+        let filtered = filter_invalid_biome_transitions_by_biome(tile.biome.biome_type, mutations);
         assert!(
             filtered
                 .mutations
@@ -378,7 +445,7 @@ mod tests {
             )],
         };
 
-        let filtered = filter_invalid_biome_transitions(&tile, mutations);
+        let filtered = filter_invalid_biome_transitions_by_biome(tile.biome.biome_type, mutations);
         assert!(
             !filtered
                 .mutations
@@ -413,7 +480,7 @@ mod tests {
             ],
         };
 
-        let filtered = filter_invalid_biome_transitions(&tile, mutations);
+        let filtered = filter_invalid_biome_transitions_by_biome(tile.biome.biome_type, mutations);
         // biome_type removed, but other mutations preserved
         assert_eq!(filtered.mutations.len(), 2);
         assert!(filtered.mutations.iter().any(|(f, _)| f == "vegetation_health"));

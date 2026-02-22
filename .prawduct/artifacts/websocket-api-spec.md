@@ -45,9 +45,12 @@ Full world state sent once when a client connects.
       "climate": { "zone": "Temperate", "base_temperature": 288.15, "base_precipitation": 0.5, "latitude": 0.2 },
       "biome": { "biome_type": "Grassland", "vegetation_density": 0.6, "vegetation_health": 0.8, "transition_pressure": 0.0, "ticks_in_current_biome": 100 },
       "resources": { "resources": [{ "resource_type": "timber", "quantity": 50.0, "max_quantity": 100.0, "renewal_rate": 0.1, "requires_biome": ["TemperateForest"] }] },
-      "weather": { "temperature": 290.0, "precipitation": 0.3, "precipitation_type": "Rain", "wind_speed": 5.0, "wind_direction": 180.0, "cloud_cover": 0.4, "humidity": 0.5, "storm_intensity": 0.0 },
+      "weather": { "temperature": 290.0, "precipitation": 0.3, "precipitation_type": "Rain", "wind_speed": 5.0, "wind_direction": 180.0, "cloud_cover": 0.4, "humidity": 0.5, "storm_intensity": 0.0, "pressure": 1013.25, "macro_wind_speed": 3.2, "macro_wind_direction": 210.0, "macro_humidity": 0.15 },
       "conditions": { "soil_moisture": 0.4, "snow_depth": 0.0, "mud_level": 0.1, "flood_level": 0.0, "frost_days": 0, "drought_days": 0, "fire_risk": 0.1 }
     }
+  ],
+  "pressure_systems": [
+    { "id": 1, "lat": 45.0, "lon": -90.0, "pressure_anomaly": -12.5, "radius": 0.3, "system_type": "MidLatCyclone", "moisture": 0.7 }
   ]
 }
 ```
@@ -63,8 +66,11 @@ Only changed tile layers are included. Unchanged layers are omitted (not null).
   "changed_tiles": [
     {
       "id": 0,
-      "weather": { "temperature": 291.0, "precipitation": 0.0, "precipitation_type": "None", "wind_speed": 4.5, "wind_direction": 175.0, "cloud_cover": 0.3, "humidity": 0.45, "storm_intensity": 0.0 }
+      "weather": { "temperature": 291.0, "precipitation": 0.0, "precipitation_type": "None", "wind_speed": 4.5, "wind_direction": 175.0, "cloud_cover": 0.3, "humidity": 0.45, "storm_intensity": 0.0, "pressure": 1010.8, "macro_wind_speed": 3.5, "macro_wind_direction": 215.0, "macro_humidity": 0.12 }
     }
+  ],
+  "pressure_systems": [
+    { "id": 1, "lat": 45.2, "lon": -89.5, "pressure_anomaly": -12.3, "radius": 0.3, "system_type": "MidLatCyclone", "moisture": 0.68 }
   ],
   "statistics": {
     "tick": 43,
@@ -80,6 +86,8 @@ Only changed tile layers are included. Unchanged layers are omitted (not null).
 ```
 
 In `changed_tiles`, only layers that actually changed are present. If a tile's weather changed but biome didn't, the `biome` key is absent (not null). Enforced by `#[serde(skip_serializing_if = "Option::is_none")]`.
+
+The `pressure_systems` array is always present in both WorldSnapshot and TickDiff. Each entry is a `PressureSystemSnapshot` with fields: `id` (u32), `lat` (f64), `lon` (f64), `pressure_anomaly` (f32), `radius` (f32), `system_type` (String, e.g. "MidLatCyclone"), and `moisture` (f32). The array may be empty if no pressure systems are active.
 
 ## HTTP Health Endpoint
 

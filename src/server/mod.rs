@@ -11,8 +11,10 @@ use tracing::{error, info, warn};
 use crate::simulation::statistics::TickStatistics;
 use crate::world::tile::Season;
 use crate::world::Tile;
+use crate::world::weather_systems::PressureSystem;
 use protocol::{
-    compute_tile_diffs, HealthStatus, TickDiff, TickStatSummary, WorldSnapshot,
+    compute_tile_diffs, HealthStatus, PressureSystemSnapshot, TickDiff, TickStatSummary,
+    WorldSnapshot,
 };
 
 /// Shared server state accessible from all connection handlers and the simulation loop.
@@ -112,6 +114,7 @@ pub fn build_diff_json(
     tick: u64,
     season: Season,
     stats: &TickStatistics,
+    pressure_systems: &[PressureSystem],
 ) -> String {
     let changed_tiles = compute_tile_diffs(before_tiles, after_tiles);
     let diff = TickDiff {
@@ -120,6 +123,10 @@ pub fn build_diff_json(
         season,
         changed_tiles,
         statistics: TickStatSummary::from_statistics(stats),
+        pressure_systems: pressure_systems
+            .iter()
+            .map(PressureSystemSnapshot::from_system)
+            .collect(),
     };
     serde_json::to_string(&diff).unwrap_or_else(|_| "{}".to_string())
 }
@@ -131,6 +138,7 @@ pub fn build_diff_json_from_layers(
     tick: u64,
     season: Season,
     stats: &TickStatistics,
+    pressure_systems: &[PressureSystem],
 ) -> String {
     let mut changed_tiles = Vec::new();
     for (i, tile) in after_tiles.iter().enumerate() {
@@ -157,6 +165,10 @@ pub fn build_diff_json_from_layers(
         season,
         changed_tiles,
         statistics: protocol::TickStatSummary::from_statistics(stats),
+        pressure_systems: pressure_systems
+            .iter()
+            .map(protocol::PressureSystemSnapshot::from_system)
+            .collect(),
     };
     serde_json::to_string(&diff).unwrap_or_else(|_ | "{}".to_string())
 }
@@ -383,7 +395,7 @@ mod tests {
         after[0].weather.temperature = 300.0;
 
         let stats = make_test_stats(1);
-        let json = build_diff_json(&before, &after, 1, Season::Spring, &stats);
+        let json = build_diff_json(&before, &after, 1, Season::Spring, &stats, &[]);
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
         assert_eq!(parsed["message_type"], "TickDiff");
         assert_eq!(parsed["tick"], 1);
@@ -399,7 +411,7 @@ mod tests {
     fn build_diff_json_empty_when_no_changes() {
         let tiles = vec![Tile::new_default(0, vec![], Position::flat(0.0, 0.0))];
         let stats = make_test_stats(1);
-        let json = build_diff_json(&tiles, &tiles, 1, Season::Spring, &stats);
+        let json = build_diff_json(&tiles, &tiles, 1, Season::Spring, &stats, &[]);
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
         assert!(parsed["changed_tiles"].as_array().unwrap().is_empty());
     }

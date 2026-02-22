@@ -13,6 +13,7 @@ use rhai::Dynamic;
 
 use crate::simulation::engine::{Phase, TileMutations};
 use crate::simulation::native_eval::NativePhaseEvaluator;
+use crate::simulation::sphere_math::{direction_on_sphere, tangent_to_bearing};
 use crate::world::tile::{Season, Tile};
 
 /// xorshift64 PRNG matching the engine's implementation.
@@ -100,11 +101,6 @@ fn neighbor_avg_f64(neighbors: &[&Tile], accessor: fn(&Tile) -> f64) -> f64 {
     sum / neighbors.len() as f64
 }
 
-/// Helper: sum of a field across neighbors.
-fn neighbor_sum_f64(neighbors: &[&Tile], accessor: fn(&Tile) -> f64) -> f64 {
-    neighbors.iter().map(|n| accessor(n)).sum()
-}
-
 /// Helper: max of a field across neighbors.
 fn neighbor_max_f64(neighbors: &[&Tile], accessor: fn(&Tile) -> f64) -> f64 {
     neighbors.iter().map(|n| accessor(n)).reduce(|a, b| a.max(b)).unwrap_or(0.0)
@@ -116,7 +112,74 @@ fn terrain_is(tile: &Tile, name: &str) -> bool {
     terrain_type_str(tile.geology.terrain_type) == name
 }
 
-pub struct NativeWeatherEvaluator;
+/// Precomputed bearing from each neighbor toward each tile (degrees).
+/// `reverse_bearings[tile_id][j]` = bearing (0=N, 90=E) from neighbor j TO tile_id.
+/// This tells us what wind direction at neighbor j would blow moisture toward tile_id.
+/// Computed once at startup to avoid ~24K trig calls per tick.
+pub struct NeighborBearings {
+    reverse_bearings: Vec<Vec<f64>>,
+    /// True when tiles have real lat/lon (geodesic). False when all lat/lon are 0 (flat hex).
+    pub has_geo: bool,
+}
+
+impl NeighborBearings {
+    /// Build bearings from a tile slice. If all tiles have lat=0 and lon=0
+    /// (flat hex topology), sets `has_geo = false` and skips trig.
+    pub fn from_tiles(tiles: &[Tile]) -> Self {
+        let has_geo = tiles.iter().any(|t| t.position.lat != 0.0 || t.position.lon != 0.0);
+        if !has_geo {
+            return Self {
+                reverse_bearings: Vec::new(),
+                has_geo: false,
+            };
+        }
+
+        let reverse_bearings: Vec<Vec<f64>> = tiles
+            .iter()
+            .map(|tile| {
+                tile.neighbors
+                    .iter()
+                    .map(|&nid| {
+                        if let Some(neighbor) = tiles.get(nid as usize) {
+                            let (east, north) = direction_on_sphere(
+                                neighbor.position.lat,
+                                neighbor.position.lon,
+                                tile.position.lat,
+                                tile.position.lon,
+                            );
+                            tangent_to_bearing(east, north)
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        Self {
+            reverse_bearings,
+            has_geo,
+        }
+    }
+
+    /// Get the bearing from neighbor index `j` toward tile `tile_id`.
+    #[inline]
+    fn bearing(&self, tile_id: usize, neighbor_idx: usize) -> f64 {
+        self.reverse_bearings[tile_id][neighbor_idx]
+    }
+}
+
+pub struct NativeWeatherEvaluator {
+    bearings: NeighborBearings,
+}
+
+impl NativeWeatherEvaluator {
+    pub fn new(tiles: &[Tile]) -> Self {
+        Self {
+            bearings: NeighborBearings::from_tiles(tiles),
+        }
+    }
+}
 
 impl NativePhaseEvaluator for NativeWeatherEvaluator {
     fn phase(&self) -> Phase {
@@ -138,10 +201,10 @@ impl NativePhaseEvaluator for NativeWeatherEvaluator {
         rule_wind_temperature(tile, neighbors, season, &mut rng, &mut accum);
 
         // ===== Rule 2: Humidity =====
-        rule_humidity(tile, neighbors, season, &mut rng, &mut accum);
+        rule_humidity(tile, neighbors, season, &mut rng, &mut accum, &self.bearings);
 
         // ===== Rule 3: Clouds & Precipitation =====
-        rule_clouds_precipitation(tile, neighbors, &mut rng, &mut accum);
+        rule_clouds_precipitation(tile, neighbors, season, &mut rng, &mut accum, &self.bearings);
 
         // ===== Rule 4: Storms =====
         rule_storms(tile, neighbors, &mut rng, &mut accum);
@@ -283,6 +346,109 @@ fn rule_wind_temperature(
     }
 }
 
+/// Compute wind-directed advection weight for a single neighbor.
+/// Returns how much this neighbor's quantity should contribute to the target tile.
+/// `neighbor_wind_dir` is the neighbor's wind direction in degrees (0=N, 90=E).
+/// `bearing_to_tile` is the bearing from neighbor toward the target tile in degrees.
+/// Positive alignment means the wind at the neighbor is blowing toward us.
+#[inline]
+fn advection_weight(neighbor_wind_dir: f64, bearing_to_tile: f64, neighbor_wind_speed: f64) -> f64 {
+    let diff_rad = (neighbor_wind_dir - bearing_to_tile).to_radians();
+    let alignment = diff_rad.cos(); // 1.0 = wind blows directly toward us, -1.0 = away
+    if alignment <= 0.0 {
+        return 0.0;
+    }
+    let speed_factor = (neighbor_wind_speed / 10.0).min(1.5);
+    alignment * speed_factor
+}
+
+/// Compute wind-directed advection of a quantity from neighbors toward a tile.
+/// Returns (advected_value, total_weight). If bearings are unavailable (flat hex),
+/// falls back to isotropic averaging.
+fn compute_advected(
+    tile: &Tile,
+    neighbors: &[&Tile],
+    bearings: &NeighborBearings,
+    accessor: fn(&Tile) -> f64,
+) -> (f64, f64) {
+    if !bearings.has_geo || neighbors.is_empty() {
+        // Fallback: isotropic average
+        let avg = neighbor_avg_f64(neighbors, accessor);
+        return (avg, 1.0);
+    }
+
+    let tile_idx = tile.id as usize;
+    let mut weighted_sum = 0.0;
+    let mut total_weight = 0.0;
+
+    for (j, n) in neighbors.iter().enumerate() {
+        let bearing = bearings.bearing(tile_idx, j);
+        let w = advection_weight(
+            n.weather.wind_direction as f64,
+            bearing,
+            n.weather.wind_speed as f64,
+        );
+        if w > 0.0 {
+            weighted_sum += accessor(n) * w;
+            total_weight += w;
+        }
+    }
+
+    if total_weight > 0.0 {
+        (weighted_sum / total_weight, total_weight)
+    } else {
+        // No upwind neighbors — use isotropic fallback
+        let avg = neighbor_avg_f64(neighbors, accessor);
+        (avg, 0.0)
+    }
+}
+
+/// Convergence vertical motion based on latitude and season.
+/// Returns a value: positive = rising air (more clouds/humidity), negative = sinking (fewer clouds).
+fn convergence_vertical_motion(lat: f64, season: Season) -> f64 {
+    let abs_lat = lat.abs();
+
+    // Seasonal ITCZ shift: moves toward summer hemisphere
+    let itcz_shift = match season {
+        Season::Summer => if lat >= 0.0 { 8.0 } else { -8.0 },
+        Season::Winter => if lat >= 0.0 { -8.0 } else { 8.0 },
+        Season::Spring => if lat >= 0.0 { 4.0 } else { -4.0 },
+        Season::Autumn => if lat >= 0.0 { -4.0 } else { 4.0 },
+    };
+
+    // Distance from ITCZ center (shifted equator)
+    let itcz_center = itcz_shift; // absolute latitude of ITCZ center
+    let dist_from_itcz = (lat - itcz_center).abs();
+
+    // ITCZ: strong rising near equator (0-10° from center)
+    if dist_from_itcz < 10.0 {
+        let strength = 1.0 - dist_from_itcz / 10.0;
+        return 0.15 * strength;
+    }
+
+    // Subtropical descent (25-35° abs lat): sinking air
+    if abs_lat >= 25.0 && abs_lat <= 35.0 {
+        let center_dist = (abs_lat - 30.0).abs();
+        let strength = 1.0 - center_dist / 5.0;
+        return -0.10 * strength;
+    }
+
+    // Polar front (55-65° abs lat): rising air
+    if abs_lat >= 55.0 && abs_lat <= 65.0 {
+        let center_dist = (abs_lat - 60.0).abs();
+        let strength = 1.0 - center_dist / 5.0;
+        return 0.08 * strength;
+    }
+
+    // Polar cap (>75°): subsidence
+    if abs_lat > 75.0 {
+        let strength = ((abs_lat - 75.0) / 15.0).min(1.0);
+        return -0.05 * strength;
+    }
+
+    0.0
+}
+
 /// Rule 2: Humidity (02-humidity.rhai)
 fn rule_humidity(
     tile: &Tile,
@@ -290,6 +456,7 @@ fn rule_humidity(
     season: Season,
     _rng: &mut Rng,
     accum: &mut WeatherAccum,
+    bearings: &NeighborBearings,
 ) {
     let terrain_str = crate::simulation::engine::terrain_type_str(tile.geology.terrain_type);
     let temp = accum.temperature; // reads Rule 1's output
@@ -301,16 +468,23 @@ fn rule_humidity(
     if temp_factor < 0.0 { temp_factor = 0.0; }
     if temp_factor > 1.5 { temp_factor = 1.5; }
 
-    let evaporation = match terrain_str {
+    let raw_evaporation = match terrain_str {
         "Ocean" => 0.08 + temp_factor * 0.12,
         "Coast" => 0.05 + temp_factor * 0.08,
         "Wetlands" => 0.04 + temp_factor * 0.04,
         _ => {
             let soil_m = tile.conditions.soil_moisture as f64;
             let veg = tile.biome.vegetation_density as f64;
-            (soil_m * 0.03 + veg * 0.01) * temp_factor
+            let veg_h = tile.biome.vegetation_health as f64;
+            // Bare soil evaporation (soil moisture + temperature driven)
+            let soil_evap = soil_m * 0.04 * temp_factor;
+            // Transpiration: healthy vegetation pumps groundwater -> atmosphere
+            let transpiration = veg * veg_h * 0.08 * temp_factor * soil_m.sqrt();
+            (soil_evap + transpiration).min(0.15)
         }
     };
+    // Diminishing returns: saturated air absorbs less moisture
+    let evaporation = raw_evaporation * (1.0 - current_humidity).max(0.0);
 
     let season_evap_mult = match season {
         Season::Summer => 1.3,
@@ -319,20 +493,59 @@ fn rule_humidity(
     };
     let evaporation = evaporation * season_evap_mult;
 
-    // === ISOTROPIC DIFFUSION ===
+    // === WIND-DIRECTED HUMIDITY ADVECTION ===
     let n_count = neighbors.len();
-    let diffused = if n_count > 0 {
-        let diffusion_sum = neighbor_sum_f64(neighbors, |t| t.weather.humidity as f64);
-        diffusion_sum / n_count as f64
+    let (advected_humidity, advection_weight_total) = compute_advected(
+        tile, neighbors, bearings, |t| t.weather.humidity as f64,
+    );
+
+    // Isotropic fallback (small component for stability)
+    let isotropic = if n_count > 0 {
+        neighbor_avg_f64(neighbors, |t| t.weather.humidity as f64)
     } else {
         current_humidity
     };
 
-    // Blend
-    let mut new_humidity = macro_humidity * 0.6
-        + current_humidity * 0.2
-        + evaporation
-        + diffused * 0.04;
+    // === MARITIME MOISTURE BOOST ===
+    // Land tiles near ocean receive onshore moisture (sea breeze effect)
+    let maritime_boost = if terrain_str != "Ocean" && terrain_str != "Coast" && n_count > 0 {
+        let ocean_count = neighbors.iter().filter(|n| {
+            let nt = crate::simulation::engine::terrain_type_str(n.geology.terrain_type);
+            nt == "Ocean" || nt == "Coast"
+        }).count();
+        let ocean_frac = ocean_count as f64 / n_count as f64;
+        ocean_frac * 0.10 * temp_factor
+    } else {
+        0.0
+    };
+
+    // === CONVERGENCE ZONE HUMIDITY EFFECT ===
+    let lat = tile.climate.latitude as f64;
+    let vertical_motion = convergence_vertical_motion(lat, season);
+    // Subsidence suppresses humidity (drier descending air)
+    let convergence_humidity_mod = if vertical_motion < 0.0 {
+        vertical_motion * 0.5 // e.g., -0.10 * 0.5 = -0.05 humidity suppression
+    } else {
+        0.0 // rising air doesn't directly add humidity (it adds clouds in Rule 3)
+    };
+
+    // === BLEND ===
+    // Macro influence proportional to coverage strength
+    let macro_weight = (macro_humidity * 3.5_f64).min(0.35);
+    let local_weight = 1.0 - macro_weight;
+
+    // Neighbor contribution: wind-directed advection dominates, small isotropic component
+    let neighbor_blend = if bearings.has_geo && advection_weight_total > 0.0 {
+        advected_humidity * 0.80 + isotropic * 0.20
+    } else {
+        isotropic // pure isotropic when no bearing data or no upwind neighbors
+    };
+
+    // Local: self-retention + advected neighbors + evaporation + maritime + convergence
+    let local_humidity = current_humidity * 0.75 + neighbor_blend * 0.20 + maritime_boost
+        + convergence_humidity_mod;
+    let mut new_humidity = macro_humidity * macro_weight
+        + (local_humidity + evaporation) * local_weight;
 
     // === OROGRAPHIC STRIPPING ===
     let orographic_loss = match terrain_str {
@@ -367,8 +580,9 @@ fn rule_humidity(
     if total_loss > 0.85 { total_loss = 0.85; }
     new_humidity *= 1.0 - total_loss;
 
-    // Natural humidity loss
-    new_humidity *= 0.997;
+    // Moisture-dependent atmospheric decay: humid air is more stable
+    let decay = (0.994 + new_humidity * 0.005).min(0.999);
+    new_humidity *= decay;
 
     if new_humidity < 0.0 { new_humidity = 0.0; }
     if new_humidity > 1.0 { new_humidity = 1.0; }
@@ -380,8 +594,10 @@ fn rule_humidity(
 fn rule_clouds_precipitation(
     tile: &Tile,
     neighbors: &[&Tile],
+    season: Season,
     rng: &mut Rng,
     accum: &mut WeatherAccum,
+    bearings: &NeighborBearings,
 ) {
     let temp = accum.temperature; // reads Rule 1's output
     let humidity = accum.humidity; // reads Rule 2's output
@@ -389,36 +605,58 @@ fn rule_clouds_precipitation(
     let terrain_str = crate::simulation::engine::terrain_type_str(tile.geology.terrain_type);
 
     // === SATURATION HUMIDITY ===
-    let mut saturation = 0.08 + (temp - 230.0) * 0.011;
-    if saturation < 0.08 { saturation = 0.08; }
-    if saturation > 0.95 { saturation = 0.95; }
+    // Higher base (0.40) prevents cold air from instantly supersaturating.
+    // Quadratic warm-end boost reflects warm air holding more moisture.
+    let warm_excess = ((temp - 270.0) / 30.0).max(0.0);
+    let mut saturation = 0.40 + (temp - 250.0) * 0.006 + warm_excess * warm_excess * 0.2;
+    if saturation < 0.40 { saturation = 0.40; }
+    if saturation > 1.2 { saturation = 1.2; }
 
     let mut relative_humidity = humidity / saturation;
-    if relative_humidity > 2.0 { relative_humidity = 2.0; }
+    if relative_humidity > 1.5 { relative_humidity = 1.5; }
 
     // === CLOUD COVER ===
-    let mut target_cloud = if relative_humidity < 0.35 {
+    // Gentler curve: peaks around 0.75 at full saturation, not 0.91+
+    let mut target_cloud = if relative_humidity < 0.30 {
         relative_humidity * 0.1
-    } else if relative_humidity < 0.6 {
-        0.035 + (relative_humidity - 0.35) * 0.7
-    } else if relative_humidity < 0.85 {
-        0.21 + (relative_humidity - 0.6) * 1.6
-    } else if relative_humidity < 1.0 {
-        0.61 + (relative_humidity - 0.85) * 2.0
+    } else if relative_humidity < 0.55 {
+        0.03 + (relative_humidity - 0.30) * 0.5
+    } else if relative_humidity < 0.80 {
+        0.155 + (relative_humidity - 0.55) * 1.2
+    } else if relative_humidity < 1.1 {
+        0.455 + (relative_humidity - 0.80) * 1.0
     } else {
-        0.91 + (relative_humidity - 1.0) * 0.1
+        0.755 + (relative_humidity - 1.1) * 0.2
     };
-    if target_cloud > 1.0 { target_cloud = 1.0; }
+    if target_cloud > 0.85 { target_cloud = 0.85; }
 
-    // Neighbor cloud influence
-    let neighbor_cloud_avg = if !neighbors.is_empty() {
+    // === CONVERGENCE ZONE CLOUD EFFECTS ===
+    let lat = tile.climate.latitude as f64;
+    let vertical_motion = convergence_vertical_motion(lat, season);
+    // Rising air boosts cloud target, sinking air suppresses
+    target_cloud += vertical_motion;
+    if target_cloud < 0.0 { target_cloud = 0.0; }
+    if target_cloud > 0.85 { target_cloud = 0.85; }
+
+    // === WIND-DIRECTED NEIGHBOR CLOUD INFLUENCE ===
+    let (advected_cloud, advection_wt) = compute_advected(
+        tile, neighbors, bearings, |t| t.weather.cloud_cover as f64,
+    );
+    let isotropic_cloud = if !neighbors.is_empty() {
         neighbor_avg_f64(neighbors, |t| t.weather.cloud_cover as f64)
     } else {
         cloud
     };
+
+    let neighbor_cloud_blend = if bearings.has_geo && advection_wt > 0.0 {
+        advected_cloud * 0.80 + isotropic_cloud * 0.20
+    } else {
+        isotropic_cloud
+    };
+
     let neighbor_storm_max = neighbor_max_f64(neighbors, |t| t.weather.storm_intensity as f64);
 
-    target_cloud = target_cloud * 0.85 + neighbor_cloud_avg * 0.15;
+    target_cloud = target_cloud * 0.85 + neighbor_cloud_blend * 0.15;
     if target_cloud > 1.0 { target_cloud = 1.0; }
 
     // Pre-storm cloud enhancement
@@ -428,12 +666,12 @@ fn rule_clouds_precipitation(
         if target_cloud > 1.0 { target_cloud = 1.0; }
     }
 
-    // Cloud inertia
+    // Cloud inertia (formation faster than dissipation, but dissipation not glacial)
     let cloud_speed = if target_cloud > cloud {
         let urgency = target_cloud - cloud;
         if urgency > 0.3 { 0.18 } else { 0.10 }
     } else {
-        0.06
+        0.10
     };
 
     let mut new_cloud = cloud + (target_cloud - cloud) * cloud_speed + rng.rand_range(-0.02, 0.02);
@@ -473,11 +711,17 @@ fn rule_clouds_precipitation(
             };
             accum.precipitation_type = precip_type.to_string();
 
-            // Precipitation removes moisture — modifies Rule 2's humidity in-place
-            let consumed = intensity * 0.25;
+            // Precipitation removes moisture — scale with available humidity
+            let consumed = intensity * 0.15 * accum.humidity;
             let mut new_h = accum.humidity - consumed;
             if new_h < 0.02 { new_h = 0.02; }
             accum.humidity = new_h;
+
+            // === PRECIPITATION CLOUD CLEARING ===
+            // Negative feedback: precipitation removes clouds (rain washes out condensation nuclei).
+            // Quadratic: light drizzle barely clears, heavy rain clears strongly.
+            let cloud_clearing = intensity * intensity * 0.20;
+            accum.cloud_cover = (accum.cloud_cover - cloud_clearing).max(0.0);
         } else {
             accum.precipitation = 0.0;
             accum.precipitation_type = "None".to_string();
@@ -650,7 +894,7 @@ mod tests {
 
     #[test]
     fn native_weather_rng_deterministic() {
-        let evaluator = NativeWeatherEvaluator;
+        let evaluator = NativeWeatherEvaluator::new(&[]);
         let tile = make_test_tile();
 
         let result_a = evaluator.evaluate(&tile, &[], Season::Spring, 0, 42);
@@ -671,7 +915,7 @@ mod tests {
 
     #[test]
     fn native_weather_produces_expected_fields() {
-        let evaluator = NativeWeatherEvaluator;
+        let evaluator = NativeWeatherEvaluator::new(&[]);
         let tile = make_test_tile();
 
         let result = evaluator.evaluate(&tile, &[], Season::Summer, 1, 12345);
@@ -689,7 +933,7 @@ mod tests {
 
     #[test]
     fn accum_no_duplicate_mutations() {
-        let evaluator = NativeWeatherEvaluator;
+        let evaluator = NativeWeatherEvaluator::new(&[]);
         let tile = make_test_tile();
 
         let result = evaluator.evaluate(&tile, &[], Season::Summer, 1, 99999);
@@ -707,7 +951,7 @@ mod tests {
     fn accum_humidity_chain() {
         // Rule 2 computes humidity from temperature+macro; Rule 3 should read
         // that computed value (not stale tile snapshot) for precipitation.
-        let evaluator = NativeWeatherEvaluator;
+        let evaluator = NativeWeatherEvaluator::new(&[]);
         let mut tile = make_test_tile();
 
         // Set up conditions for high humidity + precipitation:
@@ -746,7 +990,7 @@ mod tests {
     fn accum_storm_reads_fresh_cloud() {
         // Rule 3 builds cloud_cover from humidity; Rule 4 should see that
         // fresh value when checking nucleation thresholds (cloud > 0.35).
-        let evaluator = NativeWeatherEvaluator;
+        let evaluator = NativeWeatherEvaluator::new(&[]);
         let mut tile = make_test_tile();
 
         // Start with zero cloud cover but high humidity + low pressure
@@ -774,7 +1018,7 @@ mod tests {
     fn accum_storm_amplifies_rule1_wind() {
         // Rule 1 computes wind; Rule 4 should amplify that computed wind
         // (not the tile snapshot's wind_speed) during storms.
-        let evaluator = NativeWeatherEvaluator;
+        let evaluator = NativeWeatherEvaluator::new(&[]);
         let mut tile = make_test_tile();
 
         // Set up an active storm with conditions that keep it alive
@@ -811,5 +1055,353 @@ mod tests {
                 "Storm should amplify Rule 1's computed wind (not stale 0.0), got wind={} storm={}",
                 wind_val, storm_val);
         }
+    }
+
+    #[test]
+    fn test_humidity_stable_without_macro() {
+        // An inland tile with moderate soil/vegetation and NO macro coverage
+        // should maintain humidity within +/-10% per tick (not crash to 0).
+        let evaluator = NativeWeatherEvaluator::new(&[]);
+        let mut tile = make_test_tile();
+
+        // Inland tile: no macro coverage, moderate conditions
+        tile.weather.macro_humidity = 0.0;
+        tile.weather.macro_wind_speed = 0.0;
+        tile.weather.humidity = 0.30;
+        tile.conditions.soil_moisture = 0.4;
+        tile.biome.vegetation_density = 0.5;
+        tile.biome.vegetation_health = 0.8;
+        tile.climate.base_temperature = 290.0;
+        tile.weather.temperature = 290.0;
+
+        let result = evaluator.evaluate(&tile, &[], Season::Summer, 1, 42);
+
+        let humidity_val = result.mutations.iter()
+            .find(|(f, _)| f == "humidity")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("humidity mutation missing");
+
+        // Without macro coverage, humidity should stay roughly stable
+        // Old formula: 0.30 -> ~0.08 (catastrophic 73% loss)
+        // New formula: 0.30 -> ~0.29-0.35 (stable with evapotranspiration)
+        assert!(humidity_val > 0.20,
+            "Humidity should not crash without macro coverage: started at 0.30, got {}",
+            humidity_val);
+        assert!(humidity_val < 0.50,
+            "Humidity should not spike unreasonably: started at 0.30, got {}",
+            humidity_val);
+    }
+
+    #[test]
+    fn test_evapotranspiration_scales_with_vegetation() {
+        let evaluator = NativeWeatherEvaluator::new(&[]);
+
+        // Tile with dense, healthy forest
+        let mut forest_tile = make_test_tile();
+        forest_tile.weather.macro_humidity = 0.0;
+        forest_tile.weather.humidity = 0.20;
+        forest_tile.conditions.soil_moisture = 0.5;
+        forest_tile.biome.vegetation_density = 0.9;
+        forest_tile.biome.vegetation_health = 1.0;
+        forest_tile.climate.base_temperature = 295.0;
+        forest_tile.weather.temperature = 295.0;
+
+        // Tile with bare ground
+        let mut bare_tile = make_test_tile();
+        bare_tile.weather.macro_humidity = 0.0;
+        bare_tile.weather.humidity = 0.20;
+        bare_tile.conditions.soil_moisture = 0.5;
+        bare_tile.biome.vegetation_density = 0.0;
+        bare_tile.biome.vegetation_health = 0.0;
+        bare_tile.climate.base_temperature = 295.0;
+        bare_tile.weather.temperature = 295.0;
+
+        let forest_result = evaluator.evaluate(&forest_tile, &[], Season::Summer, 1, 42);
+        let bare_result = evaluator.evaluate(&bare_tile, &[], Season::Summer, 1, 42);
+
+        let forest_h = forest_result.mutations.iter()
+            .find(|(f, _)| f == "humidity")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("humidity mutation missing");
+        let bare_h = bare_result.mutations.iter()
+            .find(|(f, _)| f == "humidity")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("humidity mutation missing");
+
+        // Forest should produce significantly more evapotranspiration
+        assert!(forest_h > bare_h,
+            "Forest (veg=0.9) should produce more humidity than bare ground (veg=0.0): forest={}, bare={}",
+            forest_h, bare_h);
+    }
+
+    #[test]
+    fn test_precipitation_sustains_humidity() {
+        // Heavy rain at humidity 0.5 should not drain humidity below 0.35
+        let evaluator = NativeWeatherEvaluator::new(&[]);
+        let mut tile = make_test_tile();
+
+        // Set up conditions for heavy precipitation
+        tile.weather.macro_humidity = 0.6;
+        tile.weather.humidity = 0.5;
+        tile.weather.cloud_cover = 0.7;
+        tile.climate.base_temperature = 295.0;
+        tile.weather.temperature = 295.0;
+        tile.conditions.soil_moisture = 0.5;
+
+        let result = evaluator.evaluate(&tile, &[], Season::Summer, 1, 42);
+
+        let humidity_val = result.mutations.iter()
+            .find(|(f, _)| f == "humidity")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("humidity mutation missing");
+        let precip_val = result.mutations.iter()
+            .find(|(f, _)| f == "precipitation")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("precipitation mutation missing");
+
+        if precip_val > 0.1 {
+            // With the new scaled consumption, rain shouldn't drain humidity catastrophically
+            assert!(humidity_val > 0.25,
+                "After heavy rain (intensity={}), humidity should stay above 0.25, got {}",
+                precip_val, humidity_val);
+        }
+    }
+
+    // === Advection tests (geodesic tiles with real lat/lon) ===
+
+    fn make_geo_tile(id: u32, lat: f64, lon: f64, neighbors: Vec<u32>) -> Tile {
+        let mut t = Tile::new_default(id, neighbors, Position {
+            x: lat.to_radians().cos() * lon.to_radians().cos(),
+            y: lat.to_radians().cos() * lon.to_radians().sin(),
+            z: lat.to_radians().sin(),
+            lat,
+            lon,
+        });
+        t.climate.latitude = lat as f32;
+        t
+    }
+
+    #[test]
+    fn test_humidity_advects_downwind() {
+        // Tile 0 (humid, upwind) should push humidity toward tile 1 (dry, downwind).
+        // Tile 0 is west of tile 1, with eastward wind (bearing ~90°).
+        let mut t0 = make_geo_tile(0, 0.0, 0.0, vec![1]);
+        t0.weather.humidity = 0.8;
+        t0.weather.wind_direction = 90.0; // blowing east
+        t0.weather.wind_speed = 8.0;
+        t0.weather.macro_humidity = 0.0;
+
+        let mut t1 = make_geo_tile(1, 0.0, 5.0, vec![0]);
+        t1.weather.humidity = 0.1;
+        t1.weather.wind_direction = 90.0;
+        t1.weather.wind_speed = 8.0;
+        t1.weather.macro_humidity = 0.0;
+        t1.conditions.soil_moisture = 0.3;
+        t1.biome.vegetation_density = 0.3;
+        t1.biome.vegetation_health = 0.5;
+
+        let tiles = vec![t0.clone(), t1.clone()];
+        let evaluator = NativeWeatherEvaluator::new(&tiles);
+
+        // Evaluate tile 1 with tile 0 as neighbor
+        let result = evaluator.evaluate(&t1, &[&t0], Season::Summer, 1, 42);
+
+        let humidity_val = result.mutations.iter()
+            .find(|(f, _)| f == "humidity")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("humidity mutation missing");
+
+        // Tile 1 should gain humidity from upwind tile 0
+        assert!(humidity_val > 0.1,
+            "Downwind tile should gain humidity from upwind neighbor: started at 0.1, got {}",
+            humidity_val);
+    }
+
+    #[test]
+    fn test_no_advection_crosswind() {
+        // With multiple neighbors, wind direction should determine which neighbor's
+        // humidity dominates. Tile 2 (target) has two neighbors:
+        //   - Tile 0 (west, humid=0.8, wind blowing east toward tile 2)
+        //   - Tile 1 (south, dry=0.05, wind blowing east — crosswind to tile 2)
+        // Isotropic would average both neighbors equally. Wind-directed advection
+        // should weight tile 0 heavily (upwind) and tile 1 weakly (crosswind).
+        let mut t0 = make_geo_tile(0, 0.0, -5.0, vec![2]); // west of t2
+        t0.weather.humidity = 0.8;
+        t0.weather.wind_direction = 90.0; // blowing east toward t2
+        t0.weather.wind_speed = 10.0;
+
+        let mut t1 = make_geo_tile(1, -5.0, 0.0, vec![2]); // south of t2
+        t1.weather.humidity = 0.05;
+        t1.weather.wind_direction = 90.0; // blowing east — crosswind relative to t2
+        t1.weather.wind_speed = 10.0;
+
+        let mut t2 = make_geo_tile(2, 0.0, 0.0, vec![0, 1]); // target tile
+        t2.weather.humidity = 0.1;
+        t2.weather.macro_humidity = 0.0;
+        t2.conditions.soil_moisture = 0.3;
+        t2.biome.vegetation_density = 0.3;
+        t2.biome.vegetation_health = 0.5;
+
+        let tiles = vec![t0.clone(), t1.clone(), t2.clone()];
+        let evaluator = NativeWeatherEvaluator::new(&tiles);
+
+        let result = evaluator.evaluate(&t2, &[&t0, &t1], Season::Summer, 1, 42);
+
+        let h_val = result.mutations.iter()
+            .find(|(f, _)| f == "humidity")
+            .and_then(|(_, v)| v.as_float().ok())
+            .unwrap();
+
+        // Isotropic average of neighbors = (0.8 + 0.05) / 2 = 0.425
+        // Wind-directed should weight tile 0 (upwind, humid) much more heavily.
+        // With 0.75 self-retention of 0.1 = 0.075, neighbor contribution via advection
+        // should be dominated by tile 0's 0.8 humidity.
+        // Result should be noticeably above what isotropic-only would give.
+        let isotropic_neighbor_avg = (0.8 + 0.05) / 2.0;
+        let isotropic_blend = 0.1 * 0.75 + isotropic_neighbor_avg * 0.20; // ~0.16
+
+        // With advection, neighbor blend should favor tile 0's 0.8 over the 0.425 average
+        assert!(h_val > isotropic_blend,
+            "Wind-directed humidity ({}) should exceed pure isotropic blend ({}) because upwind neighbor is humid",
+            h_val, isotropic_blend);
+    }
+
+    #[test]
+    fn test_cloud_clearing_from_precipitation() {
+        // Heavy precipitation should reduce cloud cover via the clearing mechanism.
+        let evaluator = NativeWeatherEvaluator::new(&[]);
+        let mut tile = make_test_tile();
+
+        // Set up conditions for heavy precipitation
+        tile.weather.macro_humidity = 0.9;
+        tile.weather.humidity = 0.9;
+        tile.weather.cloud_cover = 0.8;
+        tile.climate.base_temperature = 295.0;
+        tile.weather.temperature = 295.0;
+
+        let result = evaluator.evaluate(&tile, &[], Season::Summer, 1, 42);
+
+        let cloud_val = result.mutations.iter()
+            .find(|(f, _)| f == "cloud_cover")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("cloud_cover mutation missing");
+        let precip_val = result.mutations.iter()
+            .find(|(f, _)| f == "precipitation")
+            .and_then(|(_, v)| v.as_float().ok())
+            .expect("precipitation mutation missing");
+
+        if precip_val > 0.3 {
+            // With heavy rain, cloud clearing should prevent cloud from staying at max
+            // cloud_clearing = intensity^2 * 0.20, e.g., 0.6^2 * 0.2 = 0.072
+            assert!(cloud_val < 0.8,
+                "Heavy precipitation ({}) should clear some clouds, but cloud_cover={}",
+                precip_val, cloud_val);
+        }
+    }
+
+    #[test]
+    fn test_convergence_zones_latitude_pattern() {
+        // Equatorial tile should get more cloud cover than subtropical tile (30°).
+        let mut equatorial = make_test_tile();
+        equatorial.climate.latitude = 5.0;
+        equatorial.weather.humidity = 0.5;
+        equatorial.weather.macro_humidity = 0.3;
+        equatorial.climate.base_temperature = 300.0;
+        equatorial.weather.temperature = 300.0;
+        equatorial.weather.cloud_cover = 0.3;
+        equatorial.conditions.soil_moisture = 0.5;
+
+        let mut subtropical = make_test_tile();
+        subtropical.climate.latitude = 30.0;
+        subtropical.weather.humidity = 0.5;
+        subtropical.weather.macro_humidity = 0.3;
+        subtropical.climate.base_temperature = 300.0;
+        subtropical.weather.temperature = 300.0;
+        subtropical.weather.cloud_cover = 0.3;
+        subtropical.conditions.soil_moisture = 0.5;
+
+        let evaluator = NativeWeatherEvaluator::new(&[]);
+
+        let eq_result = evaluator.evaluate(&equatorial, &[], Season::Summer, 1, 42);
+        let st_result = evaluator.evaluate(&subtropical, &[], Season::Summer, 1, 42);
+
+        let eq_cloud = eq_result.mutations.iter()
+            .find(|(f, _)| f == "cloud_cover")
+            .and_then(|(_, v)| v.as_float().ok())
+            .unwrap();
+        let st_cloud = st_result.mutations.iter()
+            .find(|(f, _)| f == "cloud_cover")
+            .and_then(|(_, v)| v.as_float().ok())
+            .unwrap();
+
+        // ITCZ (equatorial) rising air → more clouds
+        // Subtropical subsidence → fewer clouds
+        assert!(eq_cloud > st_cloud,
+            "Equatorial cloud ({}) should exceed subtropical cloud ({}) due to convergence zones",
+            eq_cloud, st_cloud);
+    }
+
+    #[test]
+    fn test_advection_weight_alignment() {
+        // Wind blowing directly toward target (alignment=1) should give max weight
+        let w_aligned = advection_weight(90.0, 90.0, 10.0);
+        assert!(w_aligned > 0.9, "Perfectly aligned wind should give high weight, got {}", w_aligned);
+
+        // Wind blowing perpendicular (alignment=0) should give zero
+        let w_perp = advection_weight(0.0, 90.0, 10.0);
+        assert!(w_perp < 0.01, "Perpendicular wind should give ~0 weight, got {}", w_perp);
+
+        // Wind blowing opposite (alignment=-1) should give zero
+        let w_opp = advection_weight(270.0, 90.0, 10.0);
+        assert!(w_opp < 0.01, "Opposite wind should give 0 weight, got {}", w_opp);
+    }
+
+    #[test]
+    fn test_convergence_vertical_motion_values() {
+        // ITCZ (equator) should have positive (rising)
+        let itcz = convergence_vertical_motion(0.0, Season::Spring);
+        assert!(itcz > 0.0, "ITCZ should have rising motion, got {}", itcz);
+
+        // Subtropical (~30°) should have negative (sinking)
+        let subtropical = convergence_vertical_motion(30.0, Season::Spring);
+        assert!(subtropical < 0.0, "Subtropical should have sinking motion, got {}", subtropical);
+
+        // Polar front (~60°) should have positive (rising)
+        let polar_front = convergence_vertical_motion(60.0, Season::Spring);
+        assert!(polar_front > 0.0, "Polar front should have rising motion, got {}", polar_front);
+
+        // Polar cap (>75°) should have negative (sinking)
+        let polar = convergence_vertical_motion(80.0, Season::Spring);
+        assert!(polar < 0.0, "Polar cap should have sinking motion, got {}", polar);
+    }
+
+    #[test]
+    fn test_neighbor_bearings_flat_hex_fallback() {
+        // Flat hex tiles (lat=0, lon=0) should set has_geo=false
+        let tiles = vec![
+            Tile::new_default(0, vec![1], Position::flat(0.0, 0.0)),
+            Tile::new_default(1, vec![0], Position::flat(1.0, 0.0)),
+        ];
+        let bearings = NeighborBearings::from_tiles(&tiles);
+        assert!(!bearings.has_geo, "Flat hex tiles should not have geo bearings");
+    }
+
+    #[test]
+    fn test_neighbor_bearings_geodesic() {
+        // Geodesic tiles with real lat/lon should compute bearings
+        let tiles = vec![
+            make_geo_tile(0, 0.0, 0.0, vec![1]),
+            make_geo_tile(1, 0.0, 5.0, vec![0]),
+        ];
+        let bearings = NeighborBearings::from_tiles(&tiles);
+        assert!(bearings.has_geo, "Geodesic tiles should have geo bearings");
+
+        // Bearing from tile 0 to tile 1 should be roughly east (~90°)
+        let b = bearings.bearing(1, 0); // bearing from tile 0 (neighbor idx 0 of tile 1) toward tile 1
+        // Actually: bearing from neighbor 0 of tile 1 (which is tile 0) toward tile 1
+        // Tile 0 is at (0,0), tile 1 is at (0,5) — east. So bearing from t0 to t1 is ~90°
+        // But reverse_bearings[1][0] = bearing from t0 TO t1 = ~90°
+        assert!((b - 90.0).abs() < 5.0,
+            "Bearing from (0,0) to (0,5) should be ~90°, got {}", b);
     }
 }

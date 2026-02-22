@@ -19,6 +19,7 @@ The top-level container for all simulation state.
 | topology_type | TopologyType | FlatHex or Geodesic |
 | generation_params | GenerationParams | Parameters used to generate this world |
 | snapshot_path | Option&lt;String&gt; | Path to last saved snapshot |
+| macro_weather | MacroWeatherState | Global pressure-system state (default: empty) |
 | tiles | Vec&lt;Tile&gt; | All tiles in the world |
 
 ## Tile
@@ -79,6 +80,10 @@ Constructor: `Position::flat(x, y)` creates a flat-grid position (z=0, lat/lon=0
 | cloud_cover | f32 | 0.0-1.0 | Cloud coverage |
 | humidity | f32 | 0.0-1.0 | Air moisture |
 | storm_intensity | f32 | 0.0-1.0 | Storm strength |
+| pressure | f32 | hPa | Atmospheric pressure (default 1013.25) |
+| macro_wind_speed | f32 | ≥0.0 | Wind speed contribution from macro weather (default 0.0) |
+| macro_wind_direction | f32 | 0-360 | Wind direction from macro weather in degrees (default 0.0) |
+| macro_humidity | f32 | 0.0-1.0 | Humidity contribution from macro weather (default 0.0) |
 
 ### ConditionsLayer (Mutable — updated by Conditions phase)
 | Field | Type | Range | Description |
@@ -111,6 +116,37 @@ Contains a Vec of ResourceDeposit:
 | renewal_rate | f32 | ≥0.0 | Regeneration per tick |
 | requires_biome | Option&lt;Vec&lt;BiomeType&gt;&gt; | - | Biomes where this resource can exist |
 
+## Macro Weather
+
+### MacroWeatherState
+Global state for the pressure-system simulation, stored on World.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| systems | Vec&lt;PressureSystem&gt; | Active pressure systems |
+| next_id | u32 | Next unique system ID to assign |
+| rng_state | u64 | PRNG state for deterministic system spawning |
+
+### PressureSystem
+A single travelling pressure system that influences tile-level weather.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | u32 | Unique system identifier |
+| lat | f64 | Latitude in degrees |
+| lon | f64 | Longitude in degrees |
+| x | f64 | Unit-sphere X coordinate |
+| y | f64 | Unit-sphere Y coordinate |
+| z | f64 | Unit-sphere Z coordinate |
+| pressure_anomaly | f32 | Deviation from standard pressure (negative = low, positive = high) |
+| radius | f32 | Influence radius |
+| velocity_east | f32 | Eastward movement speed |
+| velocity_north | f32 | Northward movement speed |
+| age | u32 | Current age in ticks |
+| max_age | u32 | Lifespan in ticks |
+| system_type | PressureSystemType | Classification of this system |
+| moisture | f32 | Moisture carried by the system |
+
 ## Enumerations
 
 ### Season
@@ -134,6 +170,9 @@ Ocean, Ice, Tundra, BorealForest, TemperateForest, Grassland, Savanna, Desert, T
 
 ### PrecipitationType
 None, Rain, Snow, Hail, Sleet
+
+### PressureSystemType
+MidLatCyclone, SubtropicalHigh, TropicalLow, PolarHigh, ThermalLow
 
 ## Generation Parameters
 | Field | Type | Default | Description |

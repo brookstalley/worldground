@@ -134,6 +134,7 @@ mod tests {
                 topology: crate::config::generation::TopologyConfig::default(),
             },
             snapshot_path: None,
+            macro_weather: Default::default(),
             tiles,
         }
     }

@@ -224,14 +224,14 @@ artifact_manifest:
       file_path: ".prawduct/artifacts/product-brief.md"
       version: 1
       depends_on: []
-      depended_on_by: ["Build Plan", "Test Specifications"]
+      depended_on_by: ["Build Plan", "Configuration Spec", "Data Model", "Non-functional Requirements", "Operational Spec", "Security Model", "Test Specifications"]
       last_validated: 2026-02-20
       tier: 1
     - name: "Data Model"
       file_path: ".prawduct/artifacts/data-model.md"
       version: 1
       depends_on: ["Product Brief"]
-      depended_on_by: ["Test Specifications", "Build Plan"]
+      depended_on_by: ["Build Plan", "Test Specifications", "WebSocket API Spec"]
       last_validated: 2026-02-20
       tier: 1
     - name: "Test Specifications"
@@ -252,7 +252,7 @@ artifact_manifest:
       file_path: ".prawduct/artifacts/nonfunctional-requirements.md"
       version: 1
       depends_on: ["Product Brief"]
-      depended_on_by: ["Test Specifications"]
+      depended_on_by: []
       last_validated: 2026-02-20
       tier: 2
     - name: "Operational Spec"
@@ -273,7 +273,7 @@ artifact_manifest:
       file_path: ".prawduct/artifacts/websocket-api-spec.md"
       version: 1
       depends_on: ["Data Model"]
-      depended_on_by: ["Test Specifications"]
+      depended_on_by: []
       last_validated: 2026-02-20
       tier: 2
     - name: "Configuration Spec"
@@ -342,6 +342,21 @@ change_log:
     blast_radius: meta
     classification: process
     date: 2026-02-20
+  - what: "Added 3D globe view for geodesic worlds in viewer/index.html"
+    why: "Natural extension of geodesic topology — sphere visualization with equirectangular texture mapping, raycasting renderer, drag-to-rotate, zoom, click-to-select"
+    blast_radius: viewer
+    classification: functional
+    date: 2026-02-20
+  - what: "Fixed catastrophic desertification bug in humidity blending; enhanced precipitation feedback system"
+    why: "Humidity blending formula assumed macro weather coverage was always present (0.6 fixed weight), causing 73% humidity loss per tick on uncovered tiles. Fixed with dynamic macro weighting, enhanced evapotranspiration, snowmelt feedback, moisture-dependent decay, and reduced precipitation consumption. Added 4 tests (3 unit, 1 integration)."
+    blast_radius: simulation
+    classification: functional
+    date: 2026-02-21
+  - what: "Earth-from-space weather visualization: dual-sphere raycasting, cloud layer, weather overlay"
+    why: "Added separate weather texture layer (1024x512) with cloud progression (cirrus→cumulus→storm), pressure system radial gradients, dual-sphere globe raycasting (atmosphere at 1.015x terrain radius with cloud shadows), and flat-map weather overlay pass. Toggle via checkbox."
+    blast_radius: viewer
+    classification: functional
+    date: 2026-02-21
 
 # =============================================================================
 # BUILD PLAN
@@ -369,18 +384,22 @@ dev_tools:
 build_state:
   source_root: "src/"
   test_tracking:
-    test_count: 141
+    test_count: 185
     assertion_count: 0
     test_files:
       - "src/simulation/engine.rs"
+      - "src/simulation/macro_weather.rs"
       - "src/simulation/mod.rs"
+      - "src/simulation/native_weather.rs"
       - "src/simulation/phase.rs"
+      - "src/simulation/sphere_math.rs"
       - "src/simulation/statistics.rs"
       - "src/server/mod.rs"
       - "src/server/protocol.rs"
       - "src/world/tile.rs"
       - "src/world/generation.rs"
       - "src/world/topology.rs"
+      - "src/world/weather_systems.rs"
       - "src/config/generation.rs"
       - "src/config/simulation.rs"
       - "src/persistence/snapshot.rs"
@@ -401,7 +420,14 @@ review_findings:
 # =============================================================================
 
 iteration_state:
-  feedback_cycles: []
+  feedback_cycles:
+    - feedback: "Add 3D globe view for geodesic worlds"
+      classification: functional
+      affected_artifacts: []
+      affected_files: ["viewer/index.html"]
+      status: complete
+      critic_result: "pass — 0 blocking, 0 warning, 0 note"
+      date: 2026-02-20
 
 # =============================================================================
 # OBSERVATION BACKLOG

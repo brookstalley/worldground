@@ -6,7 +6,7 @@
 - **Framework:** Rust built-in test framework (`#[test]`, `#[tokio::test]`)
 - **Dev dependencies:** `tempfile` (temporary directories for rule engine tests)
 - **Run:** `cargo test` (all tests), `cargo test --release` (with optimizations for performance tests)
-- **Test location:** Inline `#[cfg(test)] mod tests` in each source file (12 files, 141 tests total)
+- **Test location:** Inline `#[cfg(test)] mod tests` in each source file (16 files, 185 tests total)
 
 ## Test Coverage by Module
 
@@ -31,7 +31,7 @@
 | xorshift64_deterministic | PRNG is reproducible given same seed |
 | tile_to_map_has_all_layers | Rhai map includes all 6 tile layers |
 
-### Simulation Loop (src/simulation/mod.rs) — 14 tests
+### Simulation Loop (src/simulation/mod.rs) — 15 tests
 | Test | What it validates |
 |------|-------------------|
 | single_tick_produces_state_changes | One tick modifies world state |
@@ -45,9 +45,23 @@
 | cascade_detection_with_failing_rules | >10% tile errors triggers warning |
 | geodesic_world_multi_tick_no_errors | 42-tile geodesic world runs 20 ticks with neighbor_avg rule, 0 errors |
 | geodesic_pentagon_tiles_simulate_correctly | 12 pentagons + 30 hexagons verified, 10 ticks with neighbor averaging, valid temperatures |
+| test_world_does_not_desertify | 500-tile world runs 1000 ticks — desert count must not increase by >10% of land tiles |
 | performance_10k_tiles_100_ticks | ≤1000ms/tick at 10K tiles (release) |
 | per_phase_timing_within_budget | Each phase within its timing budget |
 | memory_estimate_10k_tiles_under_50mb | Peak memory under 50MB for 10K tiles |
+
+### Native Weather (src/simulation/native_weather.rs) — 9 tests
+| Test | What it validates |
+|------|-------------------|
+| native_weather_rng_deterministic | Deterministic RNG produces identical weather across runs |
+| native_weather_produces_expected_fields | All weather fields populated after native tick |
+| accum_no_duplicate_mutations | WeatherAccum chain produces no duplicate mutation keys |
+| accum_humidity_chain | Rule 2 humidity output feeds into Rule 3 cloud calculation |
+| accum_storm_reads_fresh_cloud | Rule 4 storm reads Rule 3's updated cloud_cover |
+| accum_storm_amplifies_rule1_wind | Storm intensity feeds back into wind speed |
+| test_humidity_stable_without_macro | Humidity stays stable when no macro weather system covers a tile (no catastrophic loss) |
+| test_evapotranspiration_scales_with_vegetation | Land evapotranspiration increases with vegetation density and health |
+| test_precipitation_sustains_humidity | Precipitation consumes humidity proportionally (not a fixed drain) |
 
 ### Phase Execution (src/simulation/phase.rs) — 7 tests
 Tests parallel phase execution, double-buffering, error isolation, and mutation application.

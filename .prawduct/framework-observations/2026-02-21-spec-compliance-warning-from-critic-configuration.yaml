@@ -1,0 +1,21 @@
+---
+observation_id: f123f6ba-6059-452b-ac86-f861e43e1602
+timestamp: 2026-02-21T21:23:40Z
+session_type: product_use
+session_context:
+  product_classification: "runs_unattended"
+  framework_version: 643932c
+observations:
+  - type: process_friction
+    stage: 6
+    severity: note
+    description: "Spec compliance warning from Critic: configuration spec artifact does not document native_evaluation field, NFR artifact missing native evaluation bypass documentation, rhai_floor timing change not reflected in NFR phase budget table."
+    evidence: "Critic findings: Spec Compliance warning — 3 gaps between implementation and artifact documentation for native evaluation feature"
+    status: noted
+    root_cause_analysis:
+      symptom: "Artifacts fall behind implementation during rapid iteration"
+      root_cause: "No mechanical trigger to update artifacts when code adds new config fields or changes thresholds"
+      category: incomplete_coverage
+skills_affected:
+  - "agents/artifact-generator/SKILL.md"
+---

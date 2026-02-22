@@ -157,6 +157,22 @@ pub struct WeatherLayer {
     pub cloud_cover: f32,
     pub humidity: f32,
     pub storm_intensity: f32,
+    /// Atmospheric pressure in hPa (default 1013.25), set by macro weather
+    #[serde(default = "default_pressure")]
+    pub pressure: f32,
+    /// Wind speed from macro pressure systems (m/s equivalent scale)
+    #[serde(default)]
+    pub macro_wind_speed: f32,
+    /// Wind direction from macro pressure systems (degrees, 0=N)
+    #[serde(default)]
+    pub macro_wind_direction: f32,
+    /// Humidity contribution from macro pressure systems (0.0-1.0)
+    #[serde(default)]
+    pub macro_humidity: f32,
+}
+
+fn default_pressure() -> f32 {
+    1013.25
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -225,6 +241,10 @@ impl Tile {
                 cloud_cover: 0.3,
                 humidity: 0.3,
                 storm_intensity: 0.0,
+                pressure: 1013.25,
+                macro_wind_speed: 0.0,
+                macro_wind_direction: 0.0,
+                macro_humidity: 0.0,
             },
             conditions: ConditionsLayer {
                 soil_moisture: 0.3,
