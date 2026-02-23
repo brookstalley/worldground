@@ -67,7 +67,7 @@ Constructor: `Position::flat(x, y)` creates a flat-grid position (z=0, lat/lon=0
 | zone | ClimateZone | enum | Polar, Subpolar, Temperate, Subtropical, Tropical |
 | base_temperature | f32 | Kelvin | Baseline temperature for this location |
 | base_precipitation | f32 | 0.0-1.0 | Baseline precipitation probability |
-| latitude | f32 | -1.0 to 1.0 | North-south position |
+| latitude | f32 | -90.0 to 90.0 | Latitude in degrees (matches Position.lat) |
 
 ### WeatherLayer (Mutable — updated by Weather phase)
 | Field | Type | Range | Description |
