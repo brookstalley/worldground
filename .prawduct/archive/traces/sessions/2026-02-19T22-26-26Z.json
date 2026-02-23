@@ -1,0 +1,116 @@
+{
+  "schema_version": 2,
+  "product_dir": "/Users/brookstalley/source/worldground",
+  "product_output_dir": "/Users/brookstalley/source/worldground/.prawduct",
+  "current_stage": "building",
+  "session_started": "2026-02-19T22:18:34Z",
+  "framework_edits": {
+    "files": [],
+    "total_edits": 0
+  },
+  "governance_state": {
+    "chunks_completed_without_review": 0,
+    "last_critic_review_chunk": "chunk-07",
+    "last_frp_stage": "building",
+    "stage_transitions_without_frp": 0,
+    "observations_captured_this_session": 0,
+    "product_files_changed": 0,
+    "last_product_file_edit": null,
+    "governance_checkpoints_due": [
+      "after \"chunk-06\"",
+      "after \"chunk-08\""
+    ],
+    "last_updated": "2026-02-19T22:26:13Z"
+  },
+  "directional_change": {
+    "active": false,
+    "needs_classification": false,
+    "triggered_at_file_count": 0,
+    "tier": null,
+    "plan_description": null,
+    "plan_stage_review_completed": false,
+    "retrospective_completed": false,
+    "total_phases": 0,
+    "phases_reviewed_count": 0,
+    "observation_captured": false,
+    "artifacts_verified": []
+  },
+  "pfr_state": {
+    "required": false,
+    "rca": "",
+    "governance_sensitive_files": [],
+    "observation_file": null,
+    "cosmetic_justification": null
+  },
+  "trace": {
+    "events": [
+      {
+        "ts": "2026-02-19T21:53:06Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-19T21:53:06Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-19T22:26:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-19T22:26:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": ".prawduct/project-state.yaml",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-19T22:26:10Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".prawduct/project-state.yaml",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-19T22:26:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": ".prawduct/project-state.yaml",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-19T22:26:13Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".prawduct/project-state.yaml",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-19T22:26:21Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "governed",
+        "file": "",
+        "result": "ungoverned"
+      },
+      {
+        "ts": "2026-02-19T22:26:26Z",
+        "v": 1,
+        "type": "commit_allowed",
+        "command": "git commit"
+      }
+    ]
+  }
+}

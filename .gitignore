@@ -3,8 +3,6 @@
 .prawduct/framework-version
 
 # Prawduct session files (ephemeral, machine-local)
-.prawduct/.orchestrator-activated
-.prawduct/.session-governance.json
 .prawduct/.session-governance.json.bak
 .prawduct/.session-edits.json
 .prawduct/.product-session.json
@@ -30,7 +28,6 @@
 .prawduct/.session-trace.jsonl
 
 # Prawduct session traces (local-only, never shared automatically)
-.prawduct/traces/
 
 # Prawduct machine-specific files
 
@@ -39,3 +36,9 @@
 .prawduct/.session.lock
 
 # Prawduct session traces (local-only, never shared automatically)
+
+# Prawduct session files
+.claude/settings.local.json
+.prawduct/.session-reflected
+.prawduct/.session-start
+__pycache__/

@@ -1,0 +1,3654 @@
+{
+  "schema_version": 2,
+  "product_dir": "/Users/brookstalley/source/worldground",
+  "product_output_dir": "/Users/brookstalley/source/worldground/.prawduct",
+  "current_stage": "iteration",
+  "session_started": "2026-02-20T22:00:00Z",
+  "framework_edits": {
+    "files": [],
+    "total_edits": 0
+  },
+  "governance_state": {
+    "chunks_completed_without_review": 0,
+    "last_critic_review_chunk": null,
+    "last_frp_stage": "iteration",
+    "stage_transitions_without_frp": 0,
+    "observations_captured_this_session": 0,
+    "product_files_changed": 47,
+    "last_product_file_edit": "2026-02-20T21:23:45Z",
+    "governance_checkpoints_due": [],
+    "last_updated": "2026-02-20T21:23:45Z",
+    "retroactive_review_in_progress": false
+  },
+  "directional_change": {
+    "active": true,
+    "needs_classification": false,
+    "triggered_at_file_count": 0,
+    "tier": "enhancement",
+    "plan_description": "Add geodesic sphere world model using hexasphere crate alongside existing flat hex mode",
+    "plan_stage_review_completed": false,
+    "retrospective_completed": false,
+    "total_phases": 0,
+    "phases_reviewed_count": 0,
+    "observation_captured": false,
+    "artifacts_verified": []
+  },
+  "pfr_state": {
+    "required": false,
+    "rca": "",
+    "governance_sensitive_files": [],
+    "observation_file": null,
+    "cosmetic_justification": null
+  },
+  "trace": {
+    "events": [
+      {
+        "ts": "2026-02-20T17:19:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:19:05Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:19:28Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T17:19:29Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "01-wind-temperature.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T17:20:00Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T17:20:01Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "02-humidity.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T17:20:33Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T17:20:34Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "03-clouds-precipitation.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T17:21:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T17:21:13Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "04-storms.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T17:34:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:34:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:34:40Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:34:45Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:42:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:43:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T17:43:02Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "worldgen.toml",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T17:48:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:48:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T17:54:36Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:20Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:32Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:10:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:11:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:11:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:38Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:38Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:43Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:43Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:43Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:43Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:47Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:55Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:12:58Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:13:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:38Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:38Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:38Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:42Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:45Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:45Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:46Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:17:46Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:19:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:19:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:19:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:19:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:19:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:19:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:26:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:26:11Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "engine.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:26:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:26:27Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "engine.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:26:36Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:26:37Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "engine.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:26:50Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:26:51Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "01-wind-temperature.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:27:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:27:01Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "01-wind-temperature.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:27:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:27:13Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "02-humidity.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:27:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:27:28Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "02-humidity.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:27:41Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:27:42Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "02-humidity.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:27:50Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:27:51Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "03-clouds-precipitation.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:27:59Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:28:00Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "04-storms.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:28:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:28:10Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "04-storms.rhai",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:30:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:31:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:31:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:31:59Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:06Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:19Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:19Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:32:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:35:33Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:35:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:36:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:36:13Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "security-model.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:36:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:36:19Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "security-model.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:51:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:51:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:51:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:51:57Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:52:05Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:52:06Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:52:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:52:13Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "index.html",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:52:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:52:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:52:28Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:54:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:21Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:54:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:55:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:57:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T18:57:14Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:57:15Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "operational-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:57:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:57:17Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "operational-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:57:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T18:57:23Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "operational-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T18:59:53Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:00:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:00:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:00:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:00:24Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".session-governance.json",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:01:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:01:17Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:01:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:01:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:01:23Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "config.toml",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:01:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:01:25Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "simulation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:01:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:01:26Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "simulation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:01:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:01:28Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "simulation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:01:29Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:01:30Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "index.html",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:05:29Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:05:44Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:06:00Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:06:01Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "main.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:06:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:06:11Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "main.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:06:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:06:26Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "commands.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:08:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:32Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:33Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:35Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:35Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:10:55Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:11:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:11:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:11:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:11:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:12:49Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:12:50Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:12:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:12:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:12:52Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:12:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:12:58Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "README.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:12:59Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:00Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "README.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:02Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "README.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:03Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "security-model.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:05Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "websocket-api-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:06Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:07Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "configuration-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:08Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "configuration-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:13:10Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "operational-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:13:44Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:15:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:15:29Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:15:30Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:15:37Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:15:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:16:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:16:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:16:26Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:16:52Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:17:31Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:18:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:19:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:19:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:19:25Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "engine.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:21:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:21:09Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:25:45Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:26:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:26:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:26:18Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".session-governance.json",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:26:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:30Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:28:58Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:30:29Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:32:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:38:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:41:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:42:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:49:11Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:49:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:50:11Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:50:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:52:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:52:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:52:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:52:24Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:52:29Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:52:30Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:52:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:52:35Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "protocol.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:52:39Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:52:40Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "protocol.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T19:57:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:57:39Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:57:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T19:57:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T19:57:57Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".session-governance.json",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:03:36Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:03:40Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:03:40Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:04:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:04:27Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "main.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:04:33Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:04:33Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "main.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:04:39Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:04:40Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "main.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:04:46Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:04:47Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "commands.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:04:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:04:54Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "commands.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:05:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:05:05Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "README.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:05:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:05:11Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "README.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:18:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:18:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:18:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:18:08Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "configuration-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:18:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:18:15Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "operational-spec.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:21:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:21:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:21:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:21:56Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".session-governance.json",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:22:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:55Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:55Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:24:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:05Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:06Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:11Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:11Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:12Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:18Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:32Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:25:33Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:35:34Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T20:35:35Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "spherical-world-investigation.md",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T20:39:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:49Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:55Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:39:55Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:16Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:19Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:20Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:20Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:39Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:39Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:40Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:45Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:46Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:46Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:47Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T20:40:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:17Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:45Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:50Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:05:51Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": ".session-governance.json",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:05:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:58Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:05:58Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:02Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:08Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:22Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:06:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:09:49Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:09:50Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "tile.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:09:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:09:56Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "tile.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:09:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:09:58Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "tile.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:05Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:06Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "topology.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:11Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "Cargo.toml",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:15Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:16Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "engine.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:21Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:21Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "protocol.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:35Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:36Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:37Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:37Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:10:52Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:10:53Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:10:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:58Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "statistics.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:10:58Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:10:59Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "phase.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:11:00Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:11:00Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:11:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:11:02Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:11:17Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:11:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:11:26Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "topology.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:11:43Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:11:43Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "topology.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:11:52Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:11:53Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "topology.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:12:40Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:12:41Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "topology.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:15:06Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:15:07Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "topology.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:15:26Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:15:37Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:15:38Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:15:44Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:15:45Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:15:54Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:15:54Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:16:04Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:16:11Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:16:12Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:16:27Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:16:28Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:16:36Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:16:37Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:16:48Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:16:49Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:16:59Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:00Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:10Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:10Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:17Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:18Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:17:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:17:24Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:17:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:17:30Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:17:37Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:38Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "statistics.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:40Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:41Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:42Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:43Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "snapshot.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:49Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:50Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "phase.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:17:57Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:17:57Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "protocol.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:18:03Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:18:09Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:18:10Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "mod.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:18:44Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:18:51Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:18:52Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:18:53Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:18:54Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:18:56Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:18:56Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:19:01Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:19:07Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:19:08Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "protocol.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:20:25Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:20:26Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:20:32Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:20:33Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:20:41Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:20:41Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:21:43Z",
+        "v": 1,
+        "type": "stop_check",
+        "debts_found": 4,
+        "debts_detail": [
+          "44 product file(s) edited without Critic review. Run a Critic review before ending the session.",
+          "DCP: observation not captured",
+          "DCP: retrospective incomplete",
+          "DCP: artifact freshness not verified. Read artifact_manifest in project-state.yaml, identify artifacts describing affected behavior, verify each is current, update stale ones, then record the list in directional_change.artifacts_verified"
+        ]
+      },
+      {
+        "ts": "2026-02-20T21:23:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:23:13Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:23:23Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:23:32Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:23:33Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:23:37Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:23:38Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "generation.rs",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:23:44Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "edit",
+        "file": "",
+        "result": "allow"
+      },
+      {
+        "ts": "2026-02-20T21:23:45Z",
+        "v": 1,
+        "type": "edit_tracked",
+        "file": "worldgen.toml",
+        "classification": "product",
+        "governance_sensitive": false
+      },
+      {
+        "ts": "2026-02-20T21:24:39Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:25:09Z",
+        "v": 1,
+        "type": "stop_check",
+        "debts_found": 4,
+        "debts_detail": [
+          "47 product file(s) edited without Critic review. Run a Critic review before ending the session.",
+          "DCP: observation not captured",
+          "DCP: retrospective incomplete",
+          "DCP: artifact freshness not verified. Read artifact_manifest in project-state.yaml, identify artifacts describing affected behavior, verify each is current, update stale ones, then record the list in directional_change.artifacts_verified"
+        ]
+      },
+      {
+        "ts": "2026-02-20T21:25:27Z",
+        "v": 1,
+        "type": "stop_check",
+        "debts_found": 4,
+        "debts_detail": [
+          "47 product file(s) edited without Critic review. Run a Critic review before ending the session.",
+          "DCP: observation not captured",
+          "DCP: retrospective incomplete",
+          "DCP: artifact freshness not verified. Read artifact_manifest in project-state.yaml, identify artifacts describing affected behavior, verify each is current, update stale ones, then record the list in directional_change.artifacts_verified"
+        ]
+      },
+      {
+        "ts": "2026-02-20T21:25:36Z",
+        "v": 1,
+        "type": "gate_check",
+        "rule": "read_gated",
+        "result": "skip"
+      },
+      {
+        "ts": "2026-02-20T21:25:44Z",
+        "v": 1,
+        "type": "commit_allowed",
+        "command": "git commit"
+      },
+      {
+        "ts": "2026-02-20T21:25:58Z",
+        "v": 1,
+        "type": "commit_allowed",
+        "command": "git commit"
+      },
+      {
+        "ts": "2026-02-20T21:26:10Z",
+        "v": 1,
+        "type": "commit_allowed",
+        "command": "git commit"
+      }
+    ]
+  }
+}
